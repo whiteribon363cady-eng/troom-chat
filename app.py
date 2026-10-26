@@ -1,25 +1,20 @@
+import json
 import os
-import requests
 import streamlit as st
+import requests
 
-# ページの基本設定（スマホのブラウザでも見やすいように最適化）
-st.set_page_config(
-    page_title="Ｔroom - LINE風チャット", page_icon="💬", layout="centered"
-)
+# ページの設定
+st.set_page_config(page_title="Ｔroom - LINE風チャット", page_icon="💬", layout="centered")
 
-# --- LINE風のデザインスタイル（CSS調整） ---
+# スタイリング（LINE風チャット＆メタ情報表示用）
 st.markdown(
     """
     <style>
-    /* 全体の背景色 */
-    .stApp {
-        background-color: #727D71; /* LINEのトークルーム背景に近い落ち着いた色 */
-    }
-    /* チャットメッセージの調整 */
     .chat-row {
         display: flex;
         align-items: flex-start;
         margin-bottom: 15px;
+        width: 100%;
     }
     .chat-row.user {
         flex-direction: row-reverse;
@@ -31,160 +26,224 @@ st.markdown(
         object-fit: cover;
         margin: 0 10px;
     }
-    .bubble {
+    .bubble-container {
         max-width: 70%;
+    }
+    .sender-name {
+        font-size: 12px;
+        color: #666;
+        margin-bottom: 3px;
+    }
+    .chat-row.user .sender-name {
+        text-align: right;
+    }
+    .bubble {
         padding: 10px 14px;
         border-radius: 15px;
         font-size: 15px;
-        line-height: 1.4;
-        word-break: break-word;
+        line-height: 1.5;
+        word-break: break-all;
+        position: relative;
+    }
+    .chat-row.ai .bubble {
+        background-color: #ffffff;
+        color: #333;
+        border-top-left-radius: 2px;
         box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     }
-    .bubble.ai {
-        background-color: #FFFFFF;
-        color: #000000;
-        border-top-left-radius: 3px;
+    .chat-row.user .bubble {
+        background-color: #84eb63;
+        color: #000;
+        border-top-right-radius: 2px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     }
-    .bubble.user {
-        background-color: #85E249; /* LINEの送信メッセージ風の緑 */
-        color: #000000;
-        border-top-right-radius: 3px;
+    .meta-box {
+        font-size: 11px;
+        color: #888;
+        background-color: #f0f2f5;
+        padding: 6px 10px;
+        border-radius: 8px;
+        margin-top: 5px;
+        border-left: 3px solid #84eb63;
     }
     </style>
-""",
+    """,
     unsafe_allow_html=True,
 )
 
-# --- サイドバー：設定・API情報・アイコン変更 ---
-with st.sidebar:
-    st.header("⚙️ 設定メニュー")
-
-    # DifyのAPIキー設定（サイドバーに入力）
-    api_key_input = st.text_input(
-        "Dify APIキー",
-        type="password",
-        value=os.getenv("DIFY_API_KEY", ""),
-        placeholder="app-xxxxxxxxxxxx",
-    )
-    api_base_url = st.text_input(
-        "API Base URL", value="https://api.dify.ai/v1"
-    )
-
-    st.markdown("---")
-    st.subheader("🖼️ アイコンの変更")
-    st.caption("いつでも好きな画像に変更できます")
-
-    # AIアイコンのアップロード
-    ai_img_file = st.file_uploader(
-        "AIのアイコン画像", type=["png", "jpg", "jpeg"]
-    )
-    if ai_img_file is not None:
-        st.session_state["ai_icon"] = ai_img_file
-    elif "ai_icon" not in st.session_state:
-        st.session_state["ai_icon"] = (
-            "https://api.iconify.design/lucide:bot.svg?color=%23888888"
-        )
-
-    # ユーザーアイコンのアップロード
-    user_img_file = st.file_uploader(
-        "自分のアイコン画像", type=["png", "jpg", "jpeg"]
-    )
-    if user_img_file is not None:
-        st.session_state["user_icon"] = user_img_file
-    elif "user_icon" not in st.session_state:
-        st.session_state["user_icon"] = (
-            "https://api.iconify.design/lucide:user.svg?color=%23888888"
-        )
-
-    if st.button("🗑️ チャット履歴をクリア"):
-        st.session_state.messages = []
-        st.session_state.conversation_id = ""
-        st.rerun()
-
-# --- タイトル表示 ---
-st.markdown(
-    "<h3 style='text-align: center; color: white;'>Ｔroom チャット</h3>",
-    unsafe_allow_html=True,
+# サイドバー：設定メニュー
+st.sidebar.markdown("## ⚙️ 設定メニュー")
+api_key = st.sidebar.text_input("Dify APIキー", type="password", value="")
+api_base_url = st.sidebar.text_input(
+    "API Base URL", value="https://api.dify.ai/v1"
 )
 
-# --- セッション状態の初期化 ---
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 🖼️ アイコンの変更")
+ai_icon_file = st.sidebar.file_uploader(
+    "AIのアイコン画像", type=["png", "jpg", "jpeg"]
+)
+user_icon_file = st.sidebar.file_uploader(
+    "自分のアイコン画像", type=["png", "jpg", "jpeg"]
+)
+
+ai_avatar_path = "https://api.iconify.design/noto:girl.svg"
+user_avatar_path = "https://api.iconify.design/noto:boy.svg"
+
+if ai_icon_file is not None:
+    os.makedirs("temp_imgs", exist_ok=True)
+    ai_path = os.path.join("temp_imgs", ai_icon_file.name)
+    with open(ai_path, "wb") as f:
+        f.write(ai_icon_file.getbuffer())
+    ai_avatar_path = ai_path
+
+if user_icon_file is not None:
+    os.makedirs("temp_imgs", exist_ok=True)
+    user_path = os.path.join("temp_imgs", user_icon_file.name)
+    with open(user_path, "wb") as f:
+        f.write(user_icon_file.getbuffer())
+    user_avatar_path = user_path
+
+if st.sidebar.button("🗑️ チャット履歴をクリア"):
+    st.session_state.messages = []
+    st.rerun()
+
+st.title("Ｔroom チャット")
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
-if "conversation_id" not in st.session_state:
-    st.session_state.conversation_id = ""
 
-# --- 過去のメッセージ表示 ---
-for message in st.session_state.messages:
-    role = message["role"]
-    content = message["content"]
-
-    if role == "user":
-        # ユーザー側（右側）
+# 過去のメッセージの表示
+for msg in st.session_state.messages:
+    if msg["role"] == "user":
         st.markdown(
             f"""
             <div class="chat-row user">
-                <div class="bubble user">{content}</div>
+                <img src="{user_avatar_path}" class="avatar">
+                <div class="bubble-container">
+                    <div class="sender-name">あなた</div>
+                    <div class="bubble">{msg["content"]}</div>
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
     else:
-        # AI側（左側）
+        content = msg["content"]
+        display_text = content
+        meta_info = None
+        char_name = "AI"
+
+        try:
+            parsed = json.loads(content)
+            if isinstance(parsed, dict):
+                display_text = parsed.get("message", content)
+                char_name = parsed.get("Name", "AI")
+                time_val = parsed.get("Time", "")
+                loc_val = parsed.get("Location", "")
+                outfit = parsed.get("Outfit", "")
+                expr = parsed.get("Expression", "")
+                meta_info = f"📍 {loc_val} | ⏰ {time_val} | 👗 {outfit} | ✨ {expr}"
+        except json.JSONDecodeError:
+            pass
+
+        meta_html = (
+            f'<div class="meta-box">{meta_info}</div>' if meta_info else ""
+        )
+
         st.markdown(
             f"""
-            <div class="chat-row">
-                <div class="bubble ai">{content}</div>
+            <div class="chat-row ai">
+                <img src="{ai_avatar_path}" class="avatar">
+                <div class="bubble-container">
+                    <div class="sender-name">{char_name}</div>
+                    <div class="bubble">{display_text}{meta_html}</div>
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
-# --- チャット入力欄 ---
 if prompt := st.chat_input("メッセージを入力... (ユウカ、アオイ、ノアなど)"):
-    if not api_key_input:
-        st.warning("⚠️ サイドバーにDifyのAPIキーを入力してください。")
+    if not api_key:
+        st.sidebar.error("左側のメニューからDify APIキーを入力してください。")
     else:
-        # ユーザーの入力を履歴に追加
         st.session_state.messages.append({"role": "user", "content": prompt})
-        st.rerun()
+        st.markdown(
+            f"""
+            <div class="chat-row user">
+                <img src="{user_avatar_path}" class="avatar">
+                <div class="bubble-container">
+                    <div class="sender-name">あなた</div>
+                    <div class="bubble">{prompt}</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-# ユーザー発言後のDify API呼び出し処理
-if (
-    st.session_state.messages
-    and st.session_state.messages[-1]["role"] == "user"
-):
-    last_user_msg = st.session_state.messages[-1]["content"]
-
-    with st.spinner("Ｔroomのメンバーが考えています..."):
         headers = {
-            "Authorization": f"Bearer {api_key_input}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
-
         payload = {
             "inputs": {},
-            "query": last_user_msg,
+            "query": prompt,
             "response_mode": "blocking",
-            "user": "toshifumi-user",
-            "conversation_id": st.session_state.conversation_id,
+            "user": "toshi-user",
         }
 
         try:
-            url = f"{api_base_url.rstrip('/')}/chat-messages"
-            response = requests.post(url, json=payload, headers=headers)
+            with st.spinner("考えています..."):
+                response = requests.post(
+                    f"{api_base_url}/chat-messages",
+                    headers=headers,
+                    json=payload,
+                )
 
             if response.status_code == 200:
                 res_data = response.json()
-                ai_answer = res_data.get("answer", "（返答がありませんでした）")
-                st.session_state.conversation_id = res_data.get(
-                    "conversation_id", ""
+                answer = res_data.get("answer", "（応答がありませんでした）")
+
+                st.session_state.messages.append(
+                    {"role": "ai", "content": answer}
                 )
 
-                # AIの返答を履歴に追加
-                st.session_state.messages.append(
-                    {"role": "assistant", "content": ai_answer}
+                display_text = answer
+                meta_info = None
+                char_name = "AI"
+
+                try:
+                    parsed = json.loads(answer)
+                    if isinstance(parsed, dict):
+                        display_text = parsed.get("message", answer)
+                        char_name = parsed.get("Name", "AI")
+                        time_val = parsed.get("Time", "")
+                        loc_val = parsed.get("Location", "")
+                        outfit = parsed.get("Outfit", "")
+                        expr = parsed.get("Expression", "")
+                        meta_info = (
+                            f"📍 {loc_val} | ⏰ {time_val} | 👗 {outfit} | ✨ {expr}"
+                        )
+                except json.JSONDecodeError:
+                    pass
+
+                meta_html = (
+                    f'<div class="meta-box">{meta_info}</div>' if meta_info else ""
                 )
-                st.rerun()
+
+                st.markdown(
+                    f"""
+                    <div class="chat-row ai">
+                        <img src="{ai_avatar_path}" class="avatar">
+                        <div class="bubble-container">
+                            <div class="sender-name">{char_name}</div>
+                            <div class="bubble">{display_text}{meta_html}</div>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
             else:
                 st.error(
                     f"APIエラーが発生しました (ステータスコード: {response.status_code}): {response.text}"
