@@ -79,30 +79,57 @@ api_base_url = st.sidebar.text_input(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 🖼️ アイコンの変更")
-ai_icon_file = st.sidebar.file_uploader(
-    "AIのアイコン画像", type=["png", "jpg", "jpeg"]
-)
-user_icon_file = st.sidebar.file_uploader(
-    "自分のアイコン画像", type=["png", "jpg", "jpeg"]
-)
+st.sidebar.markdown("### 🖼️ キャラクター別アイコン設定")
 
-ai_avatar_path = "https://api.iconify.design/noto:girl.svg"
+# デフォルトのアイコン画像
+default_ai_icon = "https://api.iconify.design/noto:girl.svg"
 user_avatar_path = "https://api.iconify.design/noto:boy.svg"
 
-if ai_icon_file is not None:
-    os.makedirs("temp_imgs", exist_ok=True)
-    ai_path = os.path.join("temp_imgs", ai_icon_file.name)
-    with open(ai_path, "wb") as f:
-        f.write(ai_icon_file.getbuffer())
-    ai_avatar_path = ai_path
+# 個別アイコンのファイルアップローダー
+yuuka_icon_file = st.sidebar.file_uploader(
+    "ユウカのアイコン", type=["png", "jpg", "jpeg"], key="yuuka"
+)
+aoi_icon_file = st.sidebar.file_uploader(
+    "アオイのアイコン", type=["png", "jpg", "jpeg"], key="aoi"
+)
+noa_icon_file = st.sidebar.file_uploader(
+    "ノアのアイコン", type=["png", "jpg", "jpeg"], key="noa"
+)
+user_icon_file = st.sidebar.file_uploader(
+    "自分のアイコン", type=["png", "jpg", "jpeg"], key="user"
+)
 
-if user_icon_file is not None:
-    os.makedirs("temp_imgs", exist_ok=True)
-    user_path = os.path.join("temp_imgs", user_icon_file.name)
-    with open(user_path, "wb") as f:
-        f.write(user_icon_file.getbuffer())
-    user_avatar_path = user_path
+# 保存先フォルダの作成
+os.makedirs("temp_imgs", exist_ok=True)
+
+
+# パスを管理する関数
+def save_uploaded_file(uploaded_file, default_path):
+    if uploaded_file is not None:
+        path = os.path.join("temp_imgs", uploaded_file.name)
+        with open(path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        return path
+    return default_path
+
+
+yuuka_avatar_path = save_uploaded_file(yuuka_icon_file, default_ai_icon)
+aoi_avatar_path = save_uploaded_file(aoi_icon_file, default_ai_icon)
+noa_avatar_path = save_uploaded_file(noa_icon_file, default_ai_icon)
+user_avatar_path = save_uploaded_file(user_icon_file, user_avatar_path)
+
+
+# キャラクター名に応じてアイコンを振り分ける関数
+def get_character_avatar(char_name):
+    if "ユウカ" in char_name:
+        return yuuka_avatar_path
+    elif "アオイ" in char_name:
+        return aoi_avatar_path
+    elif "ノア" in char_name:
+        return noa_avatar_path
+    else:
+        return default_ai_icon
+
 
 if st.sidebar.button("🗑️ チャット履歴をクリア"):
     st.session_state.messages = []
@@ -147,6 +174,7 @@ for msg in st.session_state.messages:
         except json.JSONDecodeError:
             pass
 
+        current_avatar = get_character_avatar(char_name)
         meta_html = (
             f'<div class="meta-box">{meta_info}</div>' if meta_info else ""
         )
@@ -154,7 +182,7 @@ for msg in st.session_state.messages:
         st.markdown(
             f"""
             <div class="chat-row ai">
-                <img src="{ai_avatar_path}" class="avatar">
+                <img src="{current_avatar}" class="avatar">
                 <div class="bubble-container">
                     <div class="sender-name">{char_name}</div>
                     <div class="bubble">{display_text}{meta_html}</div>
@@ -228,6 +256,7 @@ if prompt := st.chat_input("メッセージを入力... (ユウカ、アオイ�
                 except json.JSONDecodeError:
                     pass
 
+                current_avatar = get_character_avatar(char_name)
                 meta_html = (
                     f'<div class="meta-box">{meta_info}</div>' if meta_info else ""
                 )
@@ -235,7 +264,7 @@ if prompt := st.chat_input("メッセージを入力... (ユウカ、アオイ�
                 st.markdown(
                     f"""
                     <div class="chat-row ai">
-                        <img src="{ai_avatar_path}" class="avatar">
+                        <img src="{current_avatar}" class="avatar">
                         <div class="bubble-container">
                             <div class="sender-name">{char_name}</div>
                             <div class="bubble">{display_text}{meta_html}</div>
