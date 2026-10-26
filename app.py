@@ -138,7 +138,7 @@ if st.sidebar.button("🗑️ チャット履歴をクリア"):
     st.session_state.messages = []
     st.rerun()
 
-st.title("Ｔroom チャット")
+st.title("Ｔroom")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
