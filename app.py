@@ -105,22 +105,28 @@ user_icon_file = st.sidebar.file_uploader(
     "自分のアイコン", type=["png", "jpg", "jpeg"], key="user"
 )
 
-os.makedirs("temp_imgs", exist_ok=True)
+import base64
 
 
-def save_uploaded_file(uploaded_file, default_path):
+# アップロードされた画像を安全にブラウザで表示できる形式（Data URI）に変換する関数
+def get_image_base64(uploaded_file, default_url):
     if uploaded_file is not None:
-        path = os.path.join("temp_imgs", uploaded_file.name)
-        with open(path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
-        return path
-    return default_path
+        bytes_data = uploaded_file.getvalue()
+        encoded = base64.b64encode(bytes_data).decode("utf-8")
+        # ファイルの拡張子を取得（デフォルトはpng）
+        file_extension = uploaded_file.name.split(".")[-1].lower()
+        if file_extension in ["jpg", "jpeg"]:
+            mime = "image/jpeg"
+        else:
+            mime = "image/png"
+        return f"data:{mime};base64,{encoded}"
+    return default_url
 
 
-yuuka_avatar_path = save_uploaded_file(yuuka_icon_file, default_ai_icon)
-aoi_avatar_path = save_uploaded_file(aoi_icon_file, default_ai_icon)
-noa_avatar_path = save_uploaded_file(noa_icon_file, default_ai_icon)
-user_avatar_path = save_uploaded_file(user_icon_file, user_default_icon)
+yuuka_avatar_path = get_image_base64(yuuka_icon_file, default_ai_icon)
+aoi_avatar_path = get_image_base64(aoi_icon_file, default_ai_icon)
+noa_avatar_path = get_image_base64(noa_icon_file, default_ai_icon)
+user_avatar_path = get_image_base64(user_icon_file, user_default_icon)
 
 
 def get_character_avatar(char_name):
@@ -137,8 +143,6 @@ def get_character_avatar(char_name):
 if st.sidebar.button("🗑️ チャット履歴をクリア"):
     st.session_state.messages = []
     st.rerun()
-
-st.title("Ｔroom")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -174,14 +178,13 @@ for msg in st.session_state.messages:
                 loc_val = parsed.get("Location", "")
                 outfit = parsed.get("Outfit", "")
                 expr = parsed.get("Expression", "")
-                img_url = parsed.get("Image", "")  # 画像URLを受け取る
+                img_url = parsed.get("Image", "")
                 meta_info = f"📍 {loc_val} | ⏰ {time_val} | 👗 {outfit} | ✨ {expr}"
         except json.JSONDecodeError:
             pass
 
         current_avatar = get_character_avatar(char_name)
 
-        # 画像タグの作成
         img_html = (
             f'<img src="{img_url}" class="chat-img">'
             if img_url and img_url.startswith("http")
