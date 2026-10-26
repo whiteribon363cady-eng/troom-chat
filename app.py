@@ -6,7 +6,7 @@ import requests
 # ページの設定
 st.set_page_config(page_title="Ｔroom - LINE風チャット", page_icon="💬", layout="centered")
 
-# スタイリング（LINE風チャット＆メタ情報表示用）
+# スタイリング（LINE風チャット＆画像・メタ情報表示用）
 st.markdown(
     """
     <style>
@@ -27,7 +27,7 @@ st.markdown(
         margin: 0 10px;
     }
     .bubble-container {
-        max-width: 70%;
+        max-width: 75%;
     }
     .sender-name {
         font-size: 12px;
@@ -63,8 +63,16 @@ st.markdown(
         background-color: #f0f2f5;
         padding: 6px 10px;
         border-radius: 8px;
-        margin-top: 5px;
+        margin-top: 8px;
         border-left: 3px solid #84eb63;
+    }
+    .chat-img {
+        width: 100%;
+        max-height: 300px;
+        object-fit: cover;
+        border-radius: 10px;
+        margin-top: 8px;
+        margin-bottom: 4px;
     }
     </style>
     """,
@@ -81,11 +89,9 @@ api_base_url = st.sidebar.text_input(
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🖼️ キャラクター別アイコン設定")
 
-# デフォルトのアイコン画像
 default_ai_icon = "https://api.iconify.design/noto:girl.svg"
-user_avatar_path = "https://api.iconify.design/noto:boy.svg"
+user_default_icon = "https://api.iconify.design/noto:boy.svg"
 
-# 個別アイコンのファイルアップローダー
 yuuka_icon_file = st.sidebar.file_uploader(
     "ユウカのアイコン", type=["png", "jpg", "jpeg"], key="yuuka"
 )
@@ -99,11 +105,9 @@ user_icon_file = st.sidebar.file_uploader(
     "自分のアイコン", type=["png", "jpg", "jpeg"], key="user"
 )
 
-# 保存先フォルダの作成
 os.makedirs("temp_imgs", exist_ok=True)
 
 
-# パスを管理する関数
 def save_uploaded_file(uploaded_file, default_path):
     if uploaded_file is not None:
         path = os.path.join("temp_imgs", uploaded_file.name)
@@ -116,10 +120,9 @@ def save_uploaded_file(uploaded_file, default_path):
 yuuka_avatar_path = save_uploaded_file(yuuka_icon_file, default_ai_icon)
 aoi_avatar_path = save_uploaded_file(aoi_icon_file, default_ai_icon)
 noa_avatar_path = save_uploaded_file(noa_icon_file, default_ai_icon)
-user_avatar_path = save_uploaded_file(user_icon_file, user_avatar_path)
+user_avatar_path = save_uploaded_file(user_icon_file, user_default_icon)
 
 
-# キャラクター名に応じてアイコンを振り分ける関数
 def get_character_avatar(char_name):
     if "ユウカ" in char_name:
         return yuuka_avatar_path
@@ -160,6 +163,7 @@ for msg in st.session_state.messages:
         display_text = content
         meta_info = None
         char_name = "AI"
+        img_url = None
 
         try:
             parsed = json.loads(content)
@@ -170,11 +174,19 @@ for msg in st.session_state.messages:
                 loc_val = parsed.get("Location", "")
                 outfit = parsed.get("Outfit", "")
                 expr = parsed.get("Expression", "")
+                img_url = parsed.get("Image", "")  # 画像URLを受け取る
                 meta_info = f"📍 {loc_val} | ⏰ {time_val} | 👗 {outfit} | ✨ {expr}"
         except json.JSONDecodeError:
             pass
 
         current_avatar = get_character_avatar(char_name)
+
+        # 画像タグの作成
+        img_html = (
+            f'<img src="{img_url}" class="chat-img">'
+            if img_url and img_url.startswith("http")
+            else ""
+        )
         meta_html = (
             f'<div class="meta-box">{meta_info}</div>' if meta_info else ""
         )
@@ -185,7 +197,7 @@ for msg in st.session_state.messages:
                 <img src="{current_avatar}" class="avatar">
                 <div class="bubble-container">
                     <div class="sender-name">{char_name}</div>
-                    <div class="bubble">{display_text}{meta_html}</div>
+                    <div class="bubble">{img_html}{display_text}{meta_html}</div>
                 </div>
             </div>
             """,
@@ -240,6 +252,7 @@ if prompt := st.chat_input("メッセージを入力... (ユウカ、アオイ�
                 display_text = answer
                 meta_info = None
                 char_name = "AI"
+                img_url = None
 
                 try:
                     parsed = json.loads(answer)
@@ -250,6 +263,7 @@ if prompt := st.chat_input("メッセージを入力... (ユウカ、アオイ�
                         loc_val = parsed.get("Location", "")
                         outfit = parsed.get("Outfit", "")
                         expr = parsed.get("Expression", "")
+                        img_url = parsed.get("Image", "")
                         meta_info = (
                             f"📍 {loc_val} | ⏰ {time_val} | 👗 {outfit} | ✨ {expr}"
                         )
@@ -257,6 +271,11 @@ if prompt := st.chat_input("メッセージを入力... (ユウカ、アオイ�
                     pass
 
                 current_avatar = get_character_avatar(char_name)
+                img_html = (
+                    f'<img src="{img_url}" class="chat-img">'
+                    if img_url and img_url.startswith("http")
+                    else ""
+                )
                 meta_html = (
                     f'<div class="meta-box">{meta_info}</div>' if meta_info else ""
                 )
@@ -267,7 +286,7 @@ if prompt := st.chat_input("メッセージを入力... (ユウカ、アオイ�
                         <img src="{current_avatar}" class="avatar">
                         <div class="bubble-container">
                             <div class="sender-name">{char_name}</div>
-                            <div class="bubble">{display_text}{meta_html}</div>
+                            <div class="bubble">{img_html}{display_text}{meta_html}</div>
                         </div>
                     </div>
                     """,
