@@ -227,7 +227,7 @@ def render_ai_message(content):
             else ""
         )
         meta_html = (
-            f'<div class="meta-box">{meta_info}</div>' if meta_info else ""
+            f'<div class="meta-box">{meta_info}</div>' if meta_html else ""
         )
 
         st.markdown(
