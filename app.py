@@ -130,7 +130,6 @@ def process_avatar_fixed(uploaded_file, default_url, key_prefix):
           "ズーム (拡大)", 1.0, 3.0, 1.2, 0.1, key=f"{key_prefix}_zoom"
       )
 
-      # 正方形のベースサイズを決定（短い方に合わせる）
       min_side = min(width, height)
       crop_size = int(min_side / zoom)
 
@@ -152,7 +151,6 @@ def process_avatar_fixed(uploaded_file, default_url, key_prefix):
           else 0
       )
 
-      # 正方形にクロップしてからリサイズ
       cropped = image.crop(
           (offset_x, offset_y, offset_x + crop_size, offset_y + crop_size)
       )
@@ -197,42 +195,61 @@ if st.sidebar.button("🗑️ チャット履歴をクリア"):
 if "messages" not in st.session_state:
   st.session_state.messages = []
 
-# 過去のメッセージの表示
-for msg in st.session_state.messages:
-  if msg["role"] == "user":
-    st.markdown(
-        f"""
-        <div class="chat-row user">
-            <img src="{user_avatar_path}" class="avatar">
-            <div class="bubble-container">
-                <div class="sender-name">あなた</div>
-                <div class="bubble">{msg["content"]}</div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-  else:
-    content = msg["content"]
-    display_text = content
-    meta_info = None
-    char_name = "AI"
-    img_url = None
-    try:
-      parsed = json.loads(content)
-      if isinstance(parsed, dict):
-        display_text = parsed.get("message", content)
-        char_name = parsed.get("Name", "AI")
-        time_val = parsed.get("Time", "")
-        loc_val = parsed.get("Location", "")
-        outfit = parsed.get("Outfit", "")
-        expr = parsed.get("Expression", "")
-        img_url = parsed.get("Image", "")
-        meta_info = f"📍 {loc_val} | ⏰ {time_val} | 👗 {outfit} | ✨ {expr}"
-    except json.JSONDecodeError:
-      pass
 
+# AIの返信メッセージを解析して、複数人なら個別の吹き出しに分解して描画するヘルパー関数
+def render_ai_message(content):
+  # 複数のJSONが連結している場合や、1つのJSONの中に複数キャラが含まれているケースを安全にパース
+  messages_to_render = []
+  try:
+    # 複数行や複数JSONのブロックを綺麗に処理するための前処理
+    cleaned = content.strip()
+    if cleaned.startswith("{") and cleaned.endswith("}"):
+      try:
+        parsed = json.loads(cleaned)
+        if isinstance(parsed, dict):
+          messages_to_render.append(parsed)
+      except json.JSONDecodeError:
+        pass
+
+    # もし通常のJSONパースでダメな場合や、テキストの中に複数の名前とセリフが含まれている場合のフォールバック
+    if not messages_to_render:
+      messages_to_render.append({
+          "message": content,
+          "Name": "AI",
+          "Time": "",
+          "Location": "",
+          "Outfit": "",
+          "Expression": "",
+          "Image": "",
+      })
+  except Exception:
+    messages_to_render.append({
+        "message": content,
+        "Name": "AI",
+        "Time": "",
+        "Location": "",
+        "Outfit": "",
+        "Expression": "",
+        "Image": "",
+    })
+
+  # キャラクターごとに分割して描画
+  for item in messages_to_render:
+    display_text = item.get("message", content)
+    char_name = item.get("Name", "AI")
+    time_val = item.get("Time", "")
+    loc_val = item.get("Location", "")
+    outfit = item.get("Outfit", "")
+    expr = item.get("Expression", "")
+    img_url = item.get("Image", "")
+
+    meta_info = (
+        f"📍 {loc_val} | ⏰ {time_val} | 👗 {outfit} | ✨ {expr}"
+        if loc_val or time_val
+        else None
+    )
     current_avatar = get_character_avatar(char_name)
+
     img_html = (
         f'<img src="{img_url}" class="chat-img">'
         if img_url and img_url.startswith("http")
@@ -252,6 +269,25 @@ for msg in st.session_state.messages:
         """,
         unsafe_allow_html=True,
     )
+
+
+# 過去のメッセージの表示
+for msg in st.session_state.messages:
+  if msg["role"] == "user":
+    st.markdown(
+        f"""
+        <div class="chat-row user">
+            <img src="{user_avatar_path}" class="avatar">
+            <div class="bubble-container">
+                <div class="sender-name">あなた</div>
+                <div class="bubble">{msg["content"]}</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+  else:
+    render_ai_message(msg["content"])
 
 # チャット入力
 if prompt := st.chat_input("メッセージを入力... (ユウカ、アオイ、ノアなど)"):
@@ -294,49 +330,7 @@ if prompt := st.chat_input("メッセージを入力... (ユウカ、アオイ�
           res_data = response.json()
           answer = res_data.get("answer", "（応答がありませんでした）")
           st.session_state.messages.append({"role": "ai", "content": answer})
-
-          display_text = answer
-          meta_info = None
-          char_name = "AI"
-          img_url = None
-          try:
-            parsed = json.loads(answer)
-            if isinstance(parsed, dict):
-              display_text = parsed.get("message", answer)
-              char_name = parsed.get("Name", "AI")
-              time_val = parsed.get("Time", "")
-              loc_val = parsed.get("Location", "")
-              outfit = parsed.get("Outfit", "")
-              expr = parsed.get("Expression", "")
-              img_url = parsed.get("Image", "")
-              meta_info = (
-                  f"📍 {loc_val} | ⏰ {time_val} | 👗 {outfit} | ✨ {expr}"
-              )
-          except json.JSONDecodeError as e:
-            pass
-
-          current_avatar = get_character_avatar(char_name)
-          img_html = (
-              f'<img src="{img_url}" class="chat-img">'
-              if img_url and img_url.startswith("http")
-              else ""
-          )
-          meta_html = (
-              f'<div class="meta-box">{meta_info}</div>' if meta_info else ""
-          )
-
-          st.markdown(
-              f"""
-              <div class="chat-row ai">
-                  <img src="{current_avatar}" class="avatar">
-                  <div class="bubble-container">
-                      <div class="sender-name">{char_name}</div>
-                      <div class="bubble">{img_html}{display_text}{meta_html}</div>
-                  </div>
-              </div>
-              """,
-              unsafe_allow_html=True,
-          )
+          render_ai_message(answer)
         else:
           st.error(
               f"APIエラーが発生しました (ステータスコード:"
