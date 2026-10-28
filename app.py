@@ -94,9 +94,7 @@ api_base_url = st.sidebar.text_input(
     "API Base URL", value="https://api.dify.ai/v1"
 )
 st.sidebar.markdown("---")
-st.sidebar.markdown(
-    "### 🖼️ アイコン設定（切り取り位置を調整できます）"
-)
+st.sidebar.markdown("### 🖼️ アイコン設定")
 
 default_ai_icon = "https://api.iconify.design/noto:girl.svg"
 user_default_icon = "https://api.iconify.design/noto:boy.svg"
@@ -116,8 +114,8 @@ user_icon_file = st.sidebar.file_uploader(
 )
 
 
-# トリミング・ズーム調整機能付きのアイコン変換関数
-def process_avatar_with_crop(uploaded_file, default_url, key_prefix):
+# 画像のアスペクト比を維持して綺麗に正方形クロップする関数
+def process_avatar_fixed(uploaded_file, default_url, key_prefix):
   if uploaded_file is not None:
     try:
       from PIL import Image
@@ -127,16 +125,17 @@ def process_avatar_with_crop(uploaded_file, default_url, key_prefix):
       image = image.convert("RGB")
       width, height = image.size
 
-      st.sidebar.markdown(
-          f"*{uploaded_file.name} の切り取り調整* ज़रूरी"
-      )
-      # ズーム（拡大率）スライダー
+      st.sidebar.markdown(f"**{uploaded_file.name} の調整**")
       zoom = st.sidebar.slider(
-          "ズーム (拡大)", 1.0, 3.0, 1.0, 0.1, key=f"{key_prefix}_zoom"
+          "ズーム (拡大)", 1.0, 3.0, 1.2, 0.1, key=f"{key_prefix}_zoom"
       )
-      # 切り取り位置（上下・左右）のスライダー
-      max_x = max(0, int(width * (1.0 - 1.0 / zoom)))
-      max_y = max(0, int(height * (1.0 - 1.0 / zoom)))
+
+      # 正方形のベースサイズを決定（短い方に合わせる）
+      min_side = min(width, height)
+      crop_size = int(min_side / zoom)
+
+      max_x = max(0, width - crop_size)
+      max_y = max(0, height - crop_size)
 
       offset_x = (
           st.sidebar.slider(
@@ -153,11 +152,9 @@ def process_avatar_with_crop(uploaded_file, default_url, key_prefix):
           else 0
       )
 
-      # クロップ処理
-      crop_w = int(width / zoom)
-      crop_h = int(height / zoom)
+      # 正方形にクロップしてからリサイズ
       cropped = image.crop(
-          (offset_x, offset_y, offset_x + crop_w, offset_y + crop_h)
+          (offset_x, offset_y, offset_x + crop_size, offset_y + crop_size)
       )
       cropped = cropped.resize((200, 200), Image.Resampling.LANCZOS)
 
@@ -172,16 +169,12 @@ def process_avatar_with_crop(uploaded_file, default_url, key_prefix):
   return default_url
 
 
-yuuka_avatar_path = process_avatar_with_crop(
+yuuka_avatar_path = process_avatar_fixed(
     yuuka_icon_file, default_ai_icon, "yuuka"
 )
-aoi_avatar_path = process_avatar_with_crop(
-    aoi_icon_file, default_ai_icon, "aoi"
-)
-noa_avatar_path = process_avatar_with_crop(
-    noa_icon_file, default_ai_icon, "noa"
-)
-user_avatar_path = process_avatar_with_crop(
+aoi_avatar_path = process_avatar_fixed(aoi_icon_file, default_ai_icon, "aoi")
+noa_avatar_path = process_avatar_fixed(noa_icon_file, default_ai_icon, "noa")
+user_avatar_path = process_avatar_fixed(
     user_icon_file, user_default_icon, "user"
 )
 
