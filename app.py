@@ -246,43 +246,34 @@ def render_ai_message(content):
     except Exception:
       pass
 
-  # 2. ランダム時の複数人掛け合い（テキスト形式）の場合
-  # 「キャラ名：「セリフ」」の組み合わせをすべて抽出する
-  pattern = r"(ユウカ|アオイ|ノア)\s*[:：]\s*[「『](.*?)[」『』]"
-  # より柔軟にマッチするように修正
-  matches = re.findall(
-      r"(ユウカ|アオイ|ノア)\s*[:：]\s*[「『](.*?)(?=[」』]|$)", content, re.DOTALL
-  )
+  # 2. ランダム時の複数人掛け合い（テキスト形式：アオイ：「…」 ノア：「…」）の場合
+  lines = content.split("\n")
+  dialogues = []
+  meta_text = None
 
-  # もし上のパターンで取れなければ、シンプルに「名前：セリフ」の行を探す
-  if not matches:
-    lines = content.split("\n")
-    dialogues = []
-    for line in lines:
-      for char in ["ユウカ", "アオイ", "ノア"]:
-        if line.startswith(char) or (char in line and ":" in line):
-          # 名前とセリフに分ける
-          parts = re.split(r"[:：]", line, 1)
-          if len(parts) == 2:
-            c_name = char
-            c_speech = parts[1].strip().strip("「『」』")
+  for line in lines:
+    line_str = line.strip()
+    if line_str.startswith("📍") or "📍" in line_str:
+      meta_text = line_str
+      continue
+
+    # キャラクター名とセリフの分割を試みる
+    for char in ["ユウカ", "アオイ", "ノア"]:
+      if line_str.startswith(char) or (char in line_str and ":" in line_str):
+        parts = re.split(r"[:：]", line_str, 1)
+        if len(parts) == 2:
+          c_name = char
+          c_speech = parts[1].strip().strip("「『」』")
+          if c_speech:
             dialogues.append((c_name, c_speech))
-            break
-    if dialogues:
-      matches = dialogues
+          break
 
-  if matches:
-    # メタ情報（📍など）がテキスト末尾に含まれていれば抽出して最後のメッセージの下に表示
-    meta_match = re.search(r"(📍.*?)(?=$)", content, re.DOTALL)
-    meta_text = meta_match.group(1).strip() if meta_match else None
-
-    for i, (char_name, speech) in enumerate(matches):
+  if dialogues:
+    for i, (char_name, speech) in enumerate(dialogues):
       current_avatar = get_character_avatar(char_name)
-      clean_speech = speech.strip().strip("「『」』")
-
-      # 最後の発言者にだけメタ情報を添える
       meta_html = ""
-      if i == len(matches) - 1 and meta_text:
+      # 最後の発言者にメタ情報を添える
+      if i == len(dialogues) - 1 and meta_text:
         meta_html = f'<div class="meta-box">{meta_text}</div>'
 
       st.markdown(
@@ -291,7 +282,7 @@ def render_ai_message(content):
                 <img src="{current_avatar}" class="avatar">
                 <div class="bubble-container">
                     <div class="sender-name">{char_name}</div>
-                    <div class="bubble">{clean_speech}{meta_html}</div>
+                    <div class="bubble">{speech}{meta_html}</div>
                 </div>
             </div>
             """,
@@ -376,8 +367,3 @@ if prompt := st.chat_input("メッセージを入力... (ユウカ、アオイ�
           render_ai_message(answer)
         else:
           st.error(
-              f"APIエラーが発生しました (ステータスコード:"
-              f" {response.status_code}): {response.text}"
-          )
-    except Exception as e:
-      st.error(f"通信エラーが発生しました: {e}")
