@@ -197,41 +197,50 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# AIの返信メッセージを解析して描画する関数
+# AIの返信メッセージを解析して描画する最強の関数
 def render_ai_message(content):
   cleaned = content.strip()
 
-  # 1. JSON形式のレスポンス（個別指定のときなど）の場合
-  if cleaned.startswith("{") and cleaned.endswith("}"):
-    try:
-      parsed = json.loads(cleaned)
-      if isinstance(parsed, dict):
-        display_text = parsed.get("message", content)
-        char_name = parsed.get("Name", "AI")
-        time_val = parsed.get("Time", "")
-        loc_val = parsed.get("Location", "")
-        outfit = parsed.get("Outfit", "")
-        expr = parsed.get("Expression", "")
-        img_url = parsed.get("Image", "")
+  # 1. まずJSON形式（個別指定など）として綺麗にパースできるか試す
+  try:
+    # コードブロック（```json ... ```）がついている場合の除去
+    if "```" in cleaned:
+      blocks = re.findall(r"```(?:json)?\s*(.*?)\s*```", cleaned, re.DOTALL)
+      if blocks:
+        cleaned_json = blocks[0].strip()
+      else:
+        cleaned_json = cleaned
+    else:
+      cleaned_json = cleaned
 
-        meta_info = (
-            f"📍 {loc_val} | ⏰ {time_val} | 👗 {outfit} | ✨ {expr}"
-            if loc_val or time_val
-            else None
-        )
-        current_avatar = get_character_avatar(char_name)
+    parsed = json.loads(cleaned_json)
+    if isinstance(parsed, dict):
+      display_text = parsed.get("message", content)
+      char_name = parsed.get("Name", "AI")
+      time_val = parsed.get("Time", "")
+      loc_val = parsed.get("Location", "")
+      outfit = parsed.get("Outfit", "")
+      expr = parsed.get("Expression", "")
+      img_url = parsed.get("Image", "")
 
-        img_html = (
-            f'<img src="{img_url}" class="chat-img">'
-            if img_url and img_url.startswith("http")
-            else ""
-        )
-        meta_html = (
-            f'<div class="meta-box">{meta_info}</div>' if meta_info else ""
-        )
+      meta_info = (
+          f"📍 {loc_val} | ⏰ {time_val} | 👗 {outfit} | ✨ {expr}"
+          if loc_val or time_val
+          else None
+      )
+      current_avatar = get_character_avatar(char_name)
 
-        st.markdown(
-            f"""
+      img_html = (
+          f'<img src="{img_url}" class="chat-img">'
+          if img_url and img_url.startswith("http")
+          else ""
+      )
+      meta_html = (
+          f'<div class="meta-box">{meta_info}</div>' if meta_info else ""
+      )
+
+      st.markdown(
+          f"""
             <div class="chat-row ai">
                 <img src="{current_avatar}" class="avatar">
                 <div class="bubble-container">
@@ -240,46 +249,48 @@ def render_ai_message(content):
                 </div>
             </div>
             """,
-            unsafe_allow_html=True,
-        )
-        return
-    except json.JSONDecodeError:
-      pass
+          unsafe_allow_html=True,
+      )
+      return
+  except Exception:
+    pass
 
-  # 2. テキスト形式のレスポンス（ランダム時の掛け合いなど、例: アオイ：「…」 ノア：「…」）の場合
-  # キャラクター名とセリフのペアを柔軟に抽出する正規表現
+  # 2. テキスト形式の掛け合い（ランダム時など：ユウカ：「…」 アオイ：「…」）の場合
+  # テキストの中に含まれる「キャラクター名：セリフ」のパターンをすべて見つけ出す
   pattern = r"(ユウカ|アオイ|ノア)\s*[:：]\s*[「『](.*?)[」』]"
-  matches = re.findall(pattern, content)
+  matches = re.findall(pattern, content, re.DOTALL)
 
   if matches:
     for char_name, speech in matches:
       current_avatar = get_character_avatar(char_name)
+      clean_speech = speech.strip()
       st.markdown(
           f"""
             <div class="chat-row ai">
                 <img src="{current_avatar}" class="avatar">
                 <div class="bubble-container">
                     <div class="sender-name">{char_name}</div>
-                    <div class="bubble">{speech}</div>
+                    <div class="bubble">{clean_speech}</div>
                 </div>
             </div>
             """,
           unsafe_allow_html=True,
       )
-  else:
-    # 3. どちらにも当てはまらない通常のテキストの場合
-    st.markdown(
-        f"""
-        <div class="chat-row ai">
-            <img src="{default_ai_icon}" class="avatar">
-            <div class="bubble-container">
-                <div class="sender-name">AI</div>
-                <div class="bubble">{content}</div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    return
+
+  # 3. どちらにも綺麗に当てはまらない場合のフォールバック（通常のテキストとして表示）
+  st.markdown(
+      f"""
+      <div class="chat-row ai">
+          <img src="{default_ai_icon}" class="avatar">
+          <div class="bubble-container">
+              <div class="sender-name">AI</div>
+              <div class="bubble">{content}</div>
+          </div>
+      </div>
+      """,
+      unsafe_allow_html=True,
+  )
 
 
 # 過去のメッセージの表示
