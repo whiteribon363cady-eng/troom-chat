@@ -197,7 +197,7 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# AIの返信メッセージを解析して描画する関数
+# AIの返信メッセージを解析して描画する関数（どんな形式でも強制個別分割する最強版）
 def render_ai_message(content):
   cleaned = content.strip()
 
@@ -246,34 +246,22 @@ def render_ai_message(content):
     except Exception:
       pass
 
-  # 2. ランダム時の複数人掛け合い（行ごとに分割して処理）
-  lines = cleaned.split("\n")
-  dialogues = []
-  meta_text = None
+  # 2. アオイ：「…」 ノア：「…」 のように1行に繋がっていても、強制的に個別に切り出す
+  pattern = r"(ユウカ|アオイ|ノア)\s*[:：]\s*([「『].*?[」』])"
+  matches = re.findall(pattern, content, re.DOTALL)
 
-  for line in lines:
-    line_str = line.strip()
-    if not line_str:
-      continue
-    if line_str.startswith("📍") or "📍" in line_str:
-      meta_text = line_str
-      continue
+  if matches:
+    # メタ情報（📍〜）を抽出する
+    meta_match = re.search(r"(📍.*)", content, re.DOTALL)
+    meta_text = meta_match.group(1).strip() if meta_match else None
 
-    for char in ["ユウカ", "アオイ", "ノア"]:
-      if char in line_str and ("：" in line_str or ":" in line_str):
-        parts = re.split(r"[:：]", line_str, 1)
-        if len(parts) == 2:
-          c_name = char
-          c_speech = parts[1].strip().strip("「『」』")
-          if c_speech:
-            dialogues.append((c_name, c_speech))
-          break
-
-  if dialogues:
-    for i, (char_name, speech) in enumerate(dialogues):
+    for i, (char_name, speech) in enumerate(matches):
       current_avatar = get_character_avatar(char_name)
+      clean_speech = speech.strip().strip("「『」』")
+
       meta_html = ""
-      if i == len(dialogues) - 1 and meta_text:
+      # メタ情報は最後の発言者の下にだけ添える
+      if i == len(matches) - 1 and meta_text:
         meta_html = f'<div class="meta-box">{meta_text}</div>'
 
       st.markdown(
@@ -282,7 +270,7 @@ def render_ai_message(content):
                 <img src="{current_avatar}" class="avatar">
                 <div class="bubble-container">
                     <div class="sender-name">{char_name}</div>
-                    <div class="bubble">{speech}{meta_html}</div>
+                    <div class="bubble">{clean_speech}{meta_html}</div>
                 </div>
             </div>
             """,
