@@ -257,7 +257,6 @@ def render_ai_message(content):
       meta_text = line_str
       continue
 
-    # キャラクター名とセリフの分割を試みる
     for char in ["ユウカ", "アオイ", "ノア"]:
       if line_str.startswith(char) or (char in line_str and ":" in line_str):
         parts = re.split(r"[:：]", line_str, 1)
@@ -272,7 +271,6 @@ def render_ai_message(content):
     for i, (char_name, speech) in enumerate(dialogues):
       current_avatar = get_character_avatar(char_name)
       meta_html = ""
-      # 最後の発言者にメタ情報を添える
       if i == len(dialogues) - 1 and meta_text:
         meta_html = f'<div class="meta-box">{meta_text}</div>'
 
@@ -367,3 +365,8 @@ if prompt := st.chat_input("メッセージを入力... (ユウカ、アオイ�
           render_ai_message(answer)
         else:
           st.error(
+              f"APIエラーが発生しました (ステータスコード:"
+              f" {response.status_code}): {response.text}"
+          )
+    except Exception as e:
+      st.error(f"通信エラーが発生しました: {e}")
