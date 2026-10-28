@@ -197,50 +197,41 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# AIの返信メッセージを解析して描画する最強の関数
+# AIの返信メッセージを解析して描画する関数
 def render_ai_message(content):
   cleaned = content.strip()
 
-  # 1. まずJSON形式（個別指定など）として綺麗にパースできるか試す
-  try:
-    # コードブロック（```json ... ```）がついている場合の除去
-    if "```" in cleaned:
-      blocks = re.findall(r"```(?:json)?\s*(.*?)\s*```", cleaned, re.DOTALL)
-      if blocks:
-        cleaned_json = blocks[0].strip()
-      else:
-        cleaned_json = cleaned
-    else:
-      cleaned_json = cleaned
+  # 1. 個別指定のJSON形式の場合
+  if cleaned.startswith("{") and cleaned.endswith("}"):
+    try:
+      parsed = json.loads(cleaned)
+      if isinstance(parsed, dict):
+        display_text = parsed.get("message", content)
+        char_name = parsed.get("Name", "AI")
+        time_val = parsed.get("Time", "")
+        loc_val = parsed.get("Location", "")
+        outfit = parsed.get("Outfit", "")
+        expr = parsed.get("Expression", "")
+        img_url = parsed.get("Image", "")
 
-    parsed = json.loads(cleaned_json)
-    if isinstance(parsed, dict):
-      display_text = parsed.get("message", content)
-      char_name = parsed.get("Name", "AI")
-      time_val = parsed.get("Time", "")
-      loc_val = parsed.get("Location", "")
-      outfit = parsed.get("Outfit", "")
-      expr = parsed.get("Expression", "")
-      img_url = parsed.get("Image", "")
+        meta_info = (
+            f"📍 {loc_val} | ⏰ {time_val} | 👗 {outfit} | ✨ {expr}"
+            if loc_val or time_val
+            else None
+        )
+        current_avatar = get_character_avatar(char_name)
 
-      meta_info = (
-          f"📍 {loc_val} | ⏰ {time_val} | 👗 {outfit} | ✨ {expr}"
-          if loc_val or time_val
-          else None
-      )
-      current_avatar = get_character_avatar(char_name)
+        img_html = (
+            f'<img src="{img_url}" class="chat-img">'
+            if img_url and img_url.startswith("http")
+            else ""
+        )
+        meta_html = (
+            f'<div class="meta-box">{meta_info}</div>' if meta_info else ""
+        )
 
-      img_html = (
-          f'<img src="{img_url}" class="chat-img">'
-          if img_url and img_url.startswith("http")
-          else ""
-      )
-      meta_html = (
-          f'<div class="meta-box">{meta_info}</div>' if meta_info else ""
-      )
-
-      st.markdown(
-          f"""
+        st.markdown(
+            f"""
             <div class="chat-row ai">
                 <img src="{current_avatar}" class="avatar">
                 <div class="bubble-container">
@@ -249,28 +240,58 @@ def render_ai_message(content):
                 </div>
             </div>
             """,
-          unsafe_allow_html=True,
-      )
-      return
-  except Exception:
-    pass
+            unsafe_allow_html=True,
+        )
+        return
+    except Exception:
+      pass
 
-  # 2. テキスト形式の掛け合い（ランダム時など：ユウカ：「…」 アオイ：「…」）の場合
-  # テキストの中に含まれる「キャラクター名：セリフ」のパターンをすべて見つけ出す
-  pattern = r"(ユウカ|アオイ|ノア)\s*[:：]\s*[「『](.*?)[」』]"
-  matches = re.findall(pattern, content, re.DOTALL)
+  # 2. ランダム時の複数人掛け合い（テキスト形式）の場合
+  # 「キャラ名：「セリフ」」の組み合わせをすべて抽出する
+  pattern = r"(ユウカ|アオイ|ノア)\s*[:：]\s*[「『](.*?)[」『』]"
+  # より柔軟にマッチするように修正
+  matches = re.findall(
+      r"(ユウカ|アオイ|ノア)\s*[:：]\s*[「『](.*?)(?=[」』]|$)", content, re.DOTALL
+  )
+
+  # もし上のパターンで取れなければ、シンプルに「名前：セリフ」の行を探す
+  if not matches:
+    lines = content.split("\n")
+    dialogues = []
+    for line in lines:
+      for char in ["ユウカ", "アオイ", "ノア"]:
+        if line.startswith(char) or (char in line and ":" in line):
+          # 名前とセリフに分ける
+          parts = re.split(r"[:：]", line, 1)
+          if len(parts) == 2:
+            c_name = char
+            c_speech = parts[1].strip().strip("「『」』")
+            dialogues.append((c_name, c_speech))
+            break
+    if dialogues:
+      matches = dialogues
 
   if matches:
-    for char_name, speech in matches:
+    # メタ情報（📍など）がテキスト末尾に含まれていれば抽出して最後のメッセージの下に表示
+    meta_match = re.search(r"(📍.*?)(?=$)", content, re.DOTALL)
+    meta_text = meta_match.group(1).strip() if meta_match else None
+
+    for i, (char_name, speech) in enumerate(matches):
       current_avatar = get_character_avatar(char_name)
-      clean_speech = speech.strip()
+      clean_speech = speech.strip().strip("「『」』")
+
+      # 最後の発言者にだけメタ情報を添える
+      meta_html = ""
+      if i == len(matches) - 1 and meta_text:
+        meta_html = f'<div class="meta-box">{meta_text}</div>'
+
       st.markdown(
           f"""
             <div class="chat-row ai">
                 <img src="{current_avatar}" class="avatar">
                 <div class="bubble-container">
                     <div class="sender-name">{char_name}</div>
-                    <div class="bubble">{clean_speech}</div>
+                    <div class="bubble">{clean_speech}{meta_html}</div>
                 </div>
             </div>
             """,
@@ -278,7 +299,7 @@ def render_ai_message(content):
       )
     return
 
-  # 3. どちらにも綺麗に当てはまらない場合のフォールバック（通常のテキストとして表示）
+  # 3. どちらにも当てはまらない通常のテキストの場合
   st.markdown(
       f"""
       <div class="chat-row ai">
