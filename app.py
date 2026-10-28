@@ -95,28 +95,29 @@ api_base_url = st.sidebar.text_input(
 )
 st.sidebar.markdown("---")
 st.sidebar.markdown(
-    "### 🖼️ アイコン設定（画像をそのまま綺麗に丸く収めます）"
+    "### 🖼️ アイコン設定（切り取り位置を調整できます）"
 )
 
 default_ai_icon = "https://api.iconify.design/noto:girl.svg"
 user_default_icon = "https://api.iconify.design/noto:boy.svg"
 
+# アイコン用画像をアップロード
 yuuka_icon_file = st.sidebar.file_uploader(
-    "ユウカのアイコン", type=["png", "jpg", "jpeg"], key="yuuka"
+    "ユウカのアイコン", type=["png", "jpg", "jpeg"], key="yuuka_up"
 )
 aoi_icon_file = st.sidebar.file_uploader(
-    "アオイのアイコン", type=["png", "jpg", "jpeg"], key="aoi"
+    "アオイのアイコン", type=["png", "jpg", "jpeg"], key="aoi_up"
 )
 noa_icon_file = st.sidebar.file_uploader(
-    "ノアのアイコン", type=["png", "jpg", "jpeg"], key="noa"
+    "ノアのアイコン", type=["png", "jpg", "jpeg"], key="noa_up"
 )
 user_icon_file = st.sidebar.file_uploader(
-    "自分のアイコン", type=["png", "jpg", "jpeg"], key="user"
+    "自分のアイコン", type=["png", "jpg", "jpeg"], key="user_up"
 )
 
 
-# アップロードされた画像を比率を維持したまま綺麗な丸型アイコン用に変換する関数（強制的な中央クロップを廃止）
-def get_image_base64(uploaded_file, default_url):
+# トリミング・ズーム調整機能付きのアイコン変換関数
+def process_avatar_with_crop(uploaded_file, default_url, key_prefix):
   if uploaded_file is not None:
     try:
       from PIL import Image
@@ -124,10 +125,44 @@ def get_image_base64(uploaded_file, default_url):
 
       image = Image.open(uploaded_file)
       image = image.convert("RGB")
-      # 比率を崩さずリサイズ
-      image.thumbnail((200, 200), Image.Resampling.LANCZOS)
+      width, height = image.size
+
+      st.sidebar.markdown(
+          f"*{uploaded_file.name} の切り取り調整* ज़रूरी"
+      )
+      # ズーム（拡大率）スライダー
+      zoom = st.sidebar.slider(
+          "ズーム (拡大)", 1.0, 3.0, 1.0, 0.1, key=f"{key_prefix}_zoom"
+      )
+      # 切り取り位置（上下・左右）のスライダー
+      max_x = max(0, int(width * (1.0 - 1.0 / zoom)))
+      max_y = max(0, int(height * (1.0 - 1.0 / zoom)))
+
+      offset_x = (
+          st.sidebar.slider(
+              "左右の位置", 0, max(1, max_x), max_x // 2, key=f"{key_prefix}_x"
+          )
+          if max_x > 0
+          else 0
+      )
+      offset_y = (
+          st.sidebar.slider(
+              "上下の位置", 0, max(1, max_y), max_y // 2, key=f"{key_prefix}_y"
+          )
+          if max_y > 0
+          else 0
+      )
+
+      # クロップ処理
+      crop_w = int(width / zoom)
+      crop_h = int(height / zoom)
+      cropped = image.crop(
+          (offset_x, offset_y, offset_x + crop_w, offset_y + crop_h)
+      )
+      cropped = cropped.resize((200, 200), Image.Resampling.LANCZOS)
+
       buffered = io.BytesIO()
-      image.save(buffered, format="JPEG")
+      cropped.save(buffered, format="JPEG")
       encoded = base64.b64encode(buffered.getvalue()).decode("utf-8")
       return f"data:image/jpeg;base64,{encoded}"
     except Exception:
@@ -137,10 +172,18 @@ def get_image_base64(uploaded_file, default_url):
   return default_url
 
 
-yuuka_avatar_path = get_image_base64(yuuka_icon_file, default_ai_icon)
-aoi_avatar_path = get_image_base64(aoi_icon_file, default_ai_icon)
-noa_avatar_path = get_image_base64(noa_icon_file, default_ai_icon)
-user_avatar_path = get_image_base64(user_icon_file, user_default_icon)
+yuuka_avatar_path = process_avatar_with_crop(
+    yuuka_icon_file, default_ai_icon, "yuuka"
+)
+aoi_avatar_path = process_avatar_with_crop(
+    aoi_icon_file, default_ai_icon, "aoi"
+)
+noa_avatar_path = process_avatar_with_crop(
+    noa_icon_file, default_ai_icon, "noa"
+)
+user_avatar_path = process_avatar_with_crop(
+    user_icon_file, user_default_icon, "user"
+)
 
 
 def get_character_avatar(char_name):
