@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+import re
 import requests
 import streamlit as st
 
@@ -196,74 +197,89 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# AIの返信メッセージを解析して、複数人なら個別の吹き出しに分解して描画するヘルパー関数
+# 返信メッセージを解析して個別の吹き出しに分解して描画するヘルパー関数
 def render_ai_message(content):
-  # 複数のJSONが連結している場合や、1つのJSONの中に複数キャラが含まれているケースを安全にパース
-  messages_to_render = []
+  meta_info = None
+  img_url = None
+
+  # JSONとしてパースできる場合
   try:
-    # 複数行や複数JSONのブロックを綺麗に処理するための前処理
     cleaned = content.strip()
-    if cleaned.startswith("{") and cleaned.endswith("}"):
-      try:
-        parsed = json.loads(cleaned)
-        if isinstance(parsed, dict):
-          messages_to_render.append(parsed)
-      except json.JSONDecodeError:
-        pass
+    # コードブロックが含まれている場合の対策
+    if cleaned.startswith("```"):
+      cleaned = re.sub(r"^```(json)?\n?", "", cleaned)
+      cleaned = re.sub(r"\n?```$", "", cleaned)
 
-    # もし通常のJSONパースでダメな場合や、テキストの中に複数の名前とセリフが含まれている場合のフォールバック
-    if not messages_to_render:
-      messages_to_render.append({
-          "message": content,
-          "Name": "AI",
-          "Time": "",
-          "Location": "",
-          "Outfit": "",
-          "Expression": "",
-          "Image": "",
-      })
-  except Exception:
-    messages_to_render.append({
-        "message": content,
-        "Name": "AI",
-        "Time": "",
-        "Location": "",
-        "Outfit": "",
-        "Expression": "",
-        "Image": "",
-    })
+    parsed = json.loads(cleaned)
+    if isinstance(parsed, dict):
+      display_text = parsed.get("message", content)
+      char_name = parsed.get("Name", "AI")
+      time_val = parsed.get("Time", "")
+      loc_val = parsed.get("Location", "")
+      outfit = parsed.get("Outfit", "")
+      expr = parsed.get("Expression", "")
+      img_url = parsed.get("Image", "")
+      meta_info = (
+          f"📍 {loc_val} | ⏰ {time_val} | 👗 {outfit} | ✨ {expr}"
+          if loc_val or time_val
+          else None
+      )
 
-  # キャラクターごとに分割して描画
-  for item in messages_to_render:
-    display_text = item.get("message", content)
-    char_name = item.get("Name", "AI")
-    time_val = item.get("Time", "")
-    loc_val = item.get("Location", "")
-    outfit = item.get("Outfit", "")
-    expr = item.get("Expression", "")
-    img_url = item.get("Image", "")
+      current_avatar = get_character_avatar(char_name)
+      img_html = (
+          f'<img src="{img_url}" class="chat-img">'
+          if img_url and img_url.startswith("http")
+          else ""
+      )
+      meta_html = (
+          f'<div class="meta-box">{meta_info}</div>' if meta_info else ""
+      )
 
-    meta_info = (
-        f"📍 {loc_val} | ⏰ {time_val} | 👗 {outfit} | ✨ {expr}"
-        if loc_val or time_val
-        else None
-    )
-    current_avatar = get_character_avatar(char_name)
+      st.markdown(
+          f"""
+            <div class="chat-row ai">
+                <img src="{current_avatar}" class="avatar">
+                <div class="bubble-container">
+                    <div class="sender-name">{char_name}</div>
+                    <div class="bubble">{img_html}{display_text}{meta_html}</div>
+                </div>
+            </div>
+            """,
+          unsafe_allow_html=True,
+      )
+      return
+  except json.JSONDecodeError:
+    pass
 
-    img_html = (
-        f'<img src="{img_url}" class="chat-img">'
-        if img_url and img_url.startswith("http")
-        else ""
-    )
-    meta_html = f'<div class="meta-box">{meta_info}</div>' if meta_info else ""
+  # JSONではなくテキスト形式（例：アオイ：「…」 ノア：「…」）で返ってきた場合の分割処理
+  # 「キャラクター名：「セリフ」」のパターンを正規表現で探して分割する
+  pattern = r"(ユウカ|アオイ|ノア)\s*[:：]\s*[「『](.*?)[」』]"
+  matches = re.findall(pattern, content)
 
+  if matches:
+    for char_name, speech in matches:
+      current_avatar = get_character_avatar(char_name)
+      st.markdown(
+          f"""
+            <div class="chat-row ai">
+                <img src="{current_avatar}" class="avatar">
+                <div class="bubble-container">
+                    <div class="sender-name">{char_name}</div>
+                    <div class="bubble">{speech}</div>
+                </div>
+            </div>
+            """,
+          unsafe_allow_html=True,
+      )
+  else:
+    # どちらにも当てはまらない場合のフォールバック（従来の1つの枠で表示）
     st.markdown(
         f"""
         <div class="chat-row ai">
-            <img src="{current_avatar}" class="avatar">
+            <img src="{default_ai_icon}" class="avatar">
             <div class="bubble-container">
-                <div class="sender-name">{char_name}</div>
-                <div class="bubble">{img_html}{display_text}{meta_html}</div>
+                <div class="sender-name">AI</div>
+                <div class="bubble">{content}</div>
             </div>
         </div>
         """,
