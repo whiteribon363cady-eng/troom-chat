@@ -267,7 +267,7 @@ if prompt := st.chat_input("メッセージを入力... (ユウカ、アオイ�
                             img_url = parsed.get("Image", "")
                             meta_info = f"📍 {loc_val} | ⏰ {time_val} | 👗 {outfit} | ✨ {expr}"
                     except json.JSONDecodeError as e:
-            st.error(f"JSONパースエラーが発生しました: {e}")
+            　　　　　　 st.error(f"JSONパースエラーが発生しました: {e}")
                         pass
                         
                     current_avatar = get_character_avatar(char_name)
