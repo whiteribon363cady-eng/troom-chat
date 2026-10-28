@@ -197,7 +197,7 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# AIの返信メッセージを解析して描画する関数（強力な分割対応版）
+# AIの返信メッセージを解析して描画する関数（完全分割対応版）
 def render_ai_message(content):
   cleaned = content.strip()
 
@@ -246,8 +246,8 @@ def render_ai_message(content):
     except Exception:
       pass
 
-  # 2. ランダム時の複数人掛け合い（「キャラ名：セリフ」のパターンを文章中からすべて抜き出す）
-  # 例: アオイ：「…」 ノア：「…」 のように、たとえ1行に繋がっていても正規表現で個別に切り出します
+  # 2. ランダム時の複数人掛け合い（テキスト形式：アオイ：「…」 ノア：「…」）の場合
+  # 改行やスペースで繋がっていても、「キャラクター名：」のパターンをすべて綺麗に切り出します
   pattern = r"(ユウカ|アオイ|ノア)\s*[:：]\s*[「『](.*?)[」』]"
   matches = re.findall(pattern, content, re.DOTALL)
 
@@ -279,7 +279,7 @@ def render_ai_message(content):
       )
     return
 
-  # 3. 上記のパターンに合致しない場合のフォールバック
+  # 3. どちらにも当てはまらない通常のテキストの場合
   st.markdown(
       f"""
       <div class="chat-row ai">
