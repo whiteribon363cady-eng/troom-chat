@@ -197,11 +197,11 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# AIの返信メッセージを解析して描画する関数（確実な分割対応版）
+# AIの返信メッセージを解析して描画する関数
 def render_ai_message(content):
   cleaned = content.strip()
 
-  # 1. JSON形式の場合
+  # 1. 個別指定のJSON形式の場合
   if cleaned.startswith("{") and cleaned.endswith("}"):
     try:
       parsed = json.loads(cleaned)
@@ -246,37 +246,34 @@ def render_ai_message(content):
     except Exception:
       pass
 
-  # 2. ランダム時の複数人掛け合い（テキスト形式）の強力な分割処理
-  # 文章の中から「アオイ：」や「ノア：」、「ユウカ：」のブロックを完璧に抽出する
-  pattern = r"(ユウカ|アオイ|ノア)\s*[:：]\s*([「『].*?[」』](?=\s*(?:ユウカ|アオイ|ノア)\s*[:：]|$))"
-  matches = re.findall(
-      r"(ユウカ|アオイ|ノア)\s*[:：]\s*([「『].*?[」』])", content, re.DOTALL
-  )
+  # 2. ランダム時の複数人掛け合い（行ごとに分割して処理）
+  lines = cleaned.split("\n")
+  dialogues = []
+  meta_text = None
 
-  # もし上記でうまく取れない場合のバックアップとして、行ごとや名前の出現位置で分割
-  if not matches:
-    # 「キャラ名：」でテキスト全体を分割する
-    parts = re.split(r"(ユウカ|アオイ|ノア)\s*[:：]", content)
-    if len(parts) >= 3:
-      for i in range(1, len(parts), 2):
-        c_name = parts[i]
-        c_speech = parts[i + 1].strip()
-        # 末尾のメタ情報などを綺麗にする
-        if "📍" in c_speech:
-          c_speech = c_speech.split("📍")[0].strip()
-        matches.append((c_name, c_speech))
+  for line in lines:
+    line_str = line.strip()
+    if not line_str:
+      continue
+    if line_str.startswith("📍") or "📍" in line_str:
+      meta_text = line_str
+      continue
 
-  if matches:
-    # メタ情報（📍〜）を抽出
-    meta_match = re.search(r"(📍.*)", content, re.DOTALL)
-    meta_text = meta_match.group(1).strip() if meta_match else None
+    for char in ["ユウカ", "アオイ", "ノア"]:
+      if char in line_str and ("：" in line_str or ":" in line_str):
+        parts = re.split(r"[:：]", line_str, 1)
+        if len(parts) == 2:
+          c_name = char
+          c_speech = parts[1].strip().strip("「『」』")
+          if c_speech:
+            dialogues.append((c_name, c_speech))
+          break
 
-    for i, (char_name, speech) in enumerate(matches):
+  if dialogues:
+    for i, (char_name, speech) in enumerate(dialogues):
       current_avatar = get_character_avatar(char_name)
-      clean_speech = speech.strip().strip("「『」』")
-
       meta_html = ""
-      if i == len(matches) - 1 and meta_text:
+      if i == len(dialogues) - 1 and meta_text:
         meta_html = f'<div class="meta-box">{meta_text}</div>'
 
       st.markdown(
@@ -285,7 +282,7 @@ def render_ai_message(content):
                 <img src="{current_avatar}" class="avatar">
                 <div class="bubble-container">
                     <div class="sender-name">{char_name}</div>
-                    <div class="bubble">{clean_speech}{meta_html}</div>
+                    <div class="bubble">{speech}{meta_html}</div>
                 </div>
             </div>
             """,
