@@ -197,7 +197,7 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# AIの返信メッセージを解析して描画する関数（どんな形式でも強制個別分割する最強版）
+# AIの返信メッセージを解析して描画する関数（完全版）
 def render_ai_message(content):
   cleaned = content.strip()
 
@@ -246,21 +246,39 @@ def render_ai_message(content):
     except Exception:
       pass
 
-  # 2. アオイ：「…」 ノア：「…」 のように1行に繋がっていても、強制的に個別に切り出す
-  pattern = r"(ユウカ|アオイ|ノア)\s*[:：]\s*([「『].*?[」』])"
-  matches = re.findall(pattern, content, re.DOTALL)
+  # 2. テキストの中に「アオイ：」「ノア：」「ユウカ：」が含まれている箇所をすべて見つけて個別分割する
+  char_positions = []
+  for c in ["ユウカ", "アオイ", "ノア"]:
+    for match in re.finditer(rf"{c}\s*[:：]", cleaned):
+      char_positions.append((match.start(), c))
+
+  char_positions.sort(key=lambda x: x[0])
+  matches = []
+
+  if char_positions:
+    for i in range(len(char_positions)):
+      start_idx, char_name = char_positions[i]
+      end_idx = (
+          char_positions[i + 1][0] if i + 1 < len(char_positions) else len(cleaned)
+      )
+
+      chunk = cleaned[start_idx:end_idx].strip()
+      speech_part = re.sub(r"^(ユウカ|アオイ|ノア)\s*[:：]\s*", "", chunk).strip()
+
+      meta_text = None
+      if "📍" in speech_part:
+        parts = speech_part.split("📍")
+        speech_part = parts[0].strip()
+        meta_text = "📍 " + parts[1].strip()
+
+      clean_speech = speech_part.strip("「『」』")
+      if clean_speech:
+        matches.append((char_name, clean_speech, meta_text))
 
   if matches:
-    # メタ情報（📍〜）を抽出する
-    meta_match = re.search(r"(📍.*)", content, re.DOTALL)
-    meta_text = meta_match.group(1).strip() if meta_match else None
-
-    for i, (char_name, speech) in enumerate(matches):
+    for i, (char_name, speech, meta_text) in enumerate(matches):
       current_avatar = get_character_avatar(char_name)
-      clean_speech = speech.strip().strip("「『」』")
-
       meta_html = ""
-      # メタ情報は最後の発言者の下にだけ添える
       if i == len(matches) - 1 and meta_text:
         meta_html = f'<div class="meta-box">{meta_text}</div>'
 
@@ -270,7 +288,7 @@ def render_ai_message(content):
                 <img src="{current_avatar}" class="avatar">
                 <div class="bubble-container">
                     <div class="sender-name">{char_name}</div>
-                    <div class="bubble">{clean_speech}{meta_html}</div>
+                    <div class="bubble">{speech}{meta_html}</div>
                 </div>
             </div>
             """,
