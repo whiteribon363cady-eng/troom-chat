@@ -197,46 +197,41 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# 返信メッセージを解析して個別の吹き出しに分解して描画するヘルパー関数
+# AIの返信メッセージを解析して描画する関数
 def render_ai_message(content):
-  meta_info = None
-  img_url = None
+  cleaned = content.strip()
 
-  # JSONとしてパースできる場合
-  try:
-    cleaned = content.strip()
-    # コードブロックが含まれている場合の対策
-    if cleaned.startswith("```"):
-      cleaned = re.sub(r"^```(json)?\n?", "", cleaned)
-      cleaned = re.sub(r"\n?```$", "", cleaned)
+  # 1. JSON形式のレスポンス（個別指定のときなど）の場合
+  if cleaned.startswith("{") and cleaned.endswith("}"):
+    try:
+      parsed = json.loads(cleaned)
+      if isinstance(parsed, dict):
+        display_text = parsed.get("message", content)
+        char_name = parsed.get("Name", "AI")
+        time_val = parsed.get("Time", "")
+        loc_val = parsed.get("Location", "")
+        outfit = parsed.get("Outfit", "")
+        expr = parsed.get("Expression", "")
+        img_url = parsed.get("Image", "")
 
-    parsed = json.loads(cleaned)
-    if isinstance(parsed, dict):
-      display_text = parsed.get("message", content)
-      char_name = parsed.get("Name", "AI")
-      time_val = parsed.get("Time", "")
-      loc_val = parsed.get("Location", "")
-      outfit = parsed.get("Outfit", "")
-      expr = parsed.get("Expression", "")
-      img_url = parsed.get("Image", "")
-      meta_info = (
-          f"📍 {loc_val} | ⏰ {time_val} | 👗 {outfit} | ✨ {expr}"
-          if loc_val or time_val
-          else None
-      )
+        meta_info = (
+            f"📍 {loc_val} | ⏰ {time_val} | 👗 {outfit} | ✨ {expr}"
+            if loc_val or time_val
+            else None
+        )
+        current_avatar = get_character_avatar(char_name)
 
-      current_avatar = get_character_avatar(char_name)
-      img_html = (
-          f'<img src="{img_url}" class="chat-img">'
-          if img_url and img_url.startswith("http")
-          else ""
-      )
-      meta_html = (
-          f'<div class="meta-box">{meta_info}</div>' if meta_info else ""
-      )
+        img_html = (
+            f'<img src="{img_url}" class="chat-img">'
+            if img_url and img_url.startswith("http")
+            else ""
+        )
+        meta_html = (
+            f'<div class="meta-box">{meta_info}</div>' if meta_info else ""
+        )
 
-      st.markdown(
-          f"""
+        st.markdown(
+            f"""
             <div class="chat-row ai">
                 <img src="{current_avatar}" class="avatar">
                 <div class="bubble-container">
@@ -245,14 +240,14 @@ def render_ai_message(content):
                 </div>
             </div>
             """,
-          unsafe_allow_html=True,
-      )
-      return
-  except json.JSONDecodeError:
-    pass
+            unsafe_allow_html=True,
+        )
+        return
+    except json.JSONDecodeError:
+      pass
 
-  # JSONではなくテキスト形式（例：アオイ：「…」 ノア：「…」）で返ってきた場合の分割処理
-  # 「キャラクター名：「セリフ」」のパターンを正規表現で探して分割する
+  # 2. テキスト形式のレスポンス（ランダム時の掛け合いなど、例: アオイ：「…」 ノア：「…」）の場合
+  # キャラクター名とセリフのペアを柔軟に抽出する正規表現
   pattern = r"(ユウカ|アオイ|ノア)\s*[:：]\s*[「『](.*?)[」』]"
   matches = re.findall(pattern, content)
 
@@ -272,7 +267,7 @@ def render_ai_message(content):
           unsafe_allow_html=True,
       )
   else:
-    # どちらにも当てはまらない場合のフォールバック（従来の1つの枠で表示）
+    # 3. どちらにも当てはまらない通常のテキストの場合
     st.markdown(
         f"""
         <div class="chat-row ai">
