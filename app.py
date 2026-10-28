@@ -197,11 +197,11 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# AIの返信メッセージを解析して描画する関数（完全分割対応版）
+# AIの返信メッセージを解析して描画する関数（確実な分割対応版）
 def render_ai_message(content):
   cleaned = content.strip()
 
-  # 1. 個別指定のJSON形式の場合
+  # 1. JSON形式の場合
   if cleaned.startswith("{") and cleaned.endswith("}"):
     try:
       parsed = json.loads(cleaned)
@@ -246,21 +246,35 @@ def render_ai_message(content):
     except Exception:
       pass
 
-  # 2. ランダム時の複数人掛け合い（テキスト形式：アオイ：「…」 ノア：「…」）の場合
-  # 改行やスペースで繋がっていても、「キャラクター名：」のパターンをすべて綺麗に切り出します
-  pattern = r"(ユウカ|アオイ|ノア)\s*[:：]\s*[「『](.*?)[」』]"
-  matches = re.findall(pattern, content, re.DOTALL)
+  # 2. ランダム時の複数人掛け合い（テキスト形式）の強力な分割処理
+  # 文章の中から「アオイ：」や「ノア：」、「ユウカ：」のブロックを完璧に抽出する
+  pattern = r"(ユウカ|アオイ|ノア)\s*[:：]\s*([「『].*?[」』](?=\s*(?:ユウカ|アオイ|ノア)\s*[:：]|$))"
+  matches = re.findall(
+      r"(ユウカ|アオイ|ノア)\s*[:：]\s*([「『].*?[」』])", content, re.DOTALL
+  )
+
+  # もし上記でうまく取れない場合のバックアップとして、行ごとや名前の出現位置で分割
+  if not matches:
+    # 「キャラ名：」でテキスト全体を分割する
+    parts = re.split(r"(ユウカ|アオイ|ノア)\s*[:：]", content)
+    if len(parts) >= 3:
+      for i in range(1, len(parts), 2):
+        c_name = parts[i]
+        c_speech = parts[i + 1].strip()
+        # 末尾のメタ情報などを綺麗にする
+        if "📍" in c_speech:
+          c_speech = c_speech.split("📍")[0].strip()
+        matches.append((c_name, c_speech))
 
   if matches:
-    # メタ情報（📍で始まる部分）がテキストに含まれていれば抽出する
+    # メタ情報（📍〜）を抽出
     meta_match = re.search(r"(📍.*)", content, re.DOTALL)
     meta_text = meta_match.group(1).strip() if meta_match else None
 
     for i, (char_name, speech) in enumerate(matches):
       current_avatar = get_character_avatar(char_name)
-      clean_speech = speech.strip()
+      clean_speech = speech.strip().strip("「『」』")
 
-      # メタ情報は最後の発言者の下にだけ添える
       meta_html = ""
       if i == len(matches) - 1 and meta_text:
         meta_html = f'<div class="meta-box">{meta_text}</div>'
