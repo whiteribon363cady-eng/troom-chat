@@ -156,13 +156,14 @@ if user_icon_file is not None:
     st.session_state.user_avatar = process_avatar_fixed(user_icon_file, user_default_icon, "user")
 
 
+# キャラクター名に応じたアイコンを確実に取り出す関数
 def get_character_avatar(char_name):
-  if "ユウカ" in char_name:
-    return st.session_state.yuuka_avatar
-  elif "アオイ" in char_name:
+  if "アオイ" in char_name:
     return st.session_state.aoi_avatar
   elif "ノア" in char_name:
     return st.session_state.noa_avatar
+  elif "ユウカ" in char_name:
+    return st.session_state.yuuka_avatar
   else:
     return st.session_state.yuuka_avatar
 
@@ -280,13 +281,20 @@ def render_ai_message(content):
       )
     return
 
-  # 3. どちらにも当てはまらない通常のテキストの場合
+  # 3. どちらにも当てはまらない通常のテキストの場合（本文に含まれる名前からアイコンを推測）
+  detected_name = "ユウカ"
+  if "アオイ" in content:
+    detected_name = "アオイ"
+  elif "ノア" in content:
+    detected_name = "ノア"
+
+  current_avatar = get_character_avatar(detected_name)
   st.markdown(
       f"""
       <div class="chat-row ai">
-          <img src="{st.session_state.yuuka_avatar}" class="avatar">
+          <img src="{current_avatar}" class="avatar">
           <div class="bubble-container">
-              <div class="sender-name">ユウカ</div>
+              <div class="sender-name">{detected_name}</div>
               <div class="bubble">{content}</div>
           </div>
       </div>
