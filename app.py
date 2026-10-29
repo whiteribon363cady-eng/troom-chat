@@ -135,7 +135,7 @@ def process_avatar_fixed(uploaded_file, default_url, key_prefix):
             return f"data:image/jpeg;base64,{encoded}"
     return default_url
 
-# --- セッションステートにアイコンを永続化保存する処理（リロード対策万全版） ---
+# --- セッションステートにアイコンを永続化保存する処理（リロード対策完備） ---
 if "yuuka_avatar" not in st.session_state:
     st.session_state.yuuka_avatar = default_ai_icon
 if "aoi_avatar" not in st.session_state:
