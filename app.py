@@ -181,9 +181,15 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# AIの返信メッセージを解析して描画する関数（完全版）
+# AIの返信メッセージを解析して描画する関数（修正版）
 def render_ai_message(content):
   cleaned = content.strip()
+
+  # Markdownのコードブロック（```json ... ```）で囲まれていたら綺麗に剥ぎ取る
+  if cleaned.startswith("```"):
+    cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
+    cleaned = re.sub(r"\s*```$", "", cleaned)
+    cleaned = cleaned.strip()
 
   # 1. 個別指定のJSON形式の場合
   if cleaned.startswith("{") and cleaned.endswith("}"):
@@ -191,7 +197,7 @@ def render_ai_message(content):
       parsed = json.loads(cleaned)
       if isinstance(parsed, dict):
         display_text = parsed.get("message", content)
-        char_name = parsed.get("Name", "AI")
+        char_name = parsed.get("Name", "ユウカ")
         time_val = parsed.get("Time", "")
         loc_val = parsed.get("Location", "")
         outfit = parsed.get("Outfit", "")
@@ -211,7 +217,7 @@ def render_ai_message(content):
             else ""
         )
         meta_html = (
-            f'<div class="meta-box">{meta_info}</div>' if meta_html else ""
+            f'<div class="meta-box">{meta_info}</div>' if meta_info else ""
         )
 
         st.markdown(
@@ -284,9 +290,9 @@ def render_ai_message(content):
   st.markdown(
       f"""
       <div class="chat-row ai">
-          <img src="{default_ai_icon}" class="avatar">
+          <img src="{yuuka_avatar_path}" class="avatar">
           <div class="bubble-container">
-              <div class="sender-name">AI</div>
+              <div class="sender-name">ユウカ</div>
               <div class="bubble">{content}</div>
           </div>
       </div>
