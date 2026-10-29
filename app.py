@@ -101,81 +101,65 @@ default_ai_icon = "https://api.iconify.design/noto:girl.svg"
 user_default_icon = "https://api.iconify.design/noto:boy.svg"
 
 # アイコン用画像をアップロード
-yuuka_icon_file = st.sidebar.file_uploader(
-    "ユウカのアイコン", type=["png", "jpg", "jpeg"], key="yuuka_up"
-)
-aoi_icon_file = st.sidebar.file_uploader(
-    "アオイのアイコン", type=["png", "jpg", "jpeg"], key="aoi_up"
-)
-noa_icon_file = st.sidebar.file_uploader(
-    "ノアのアイコン", type=["png", "jpg", "jpeg"], key="noa_up"
-)
-user_icon_file = st.sidebar.file_uploader(
-    "自分のアイコン", type=["png", "jpg", "jpeg"], key="user_up"
-)
-
+yuuka_icon_file = st.sidebar.file_uploader("ユウカのアイコン", type=["png", "jpg", "jpeg"], key="yuuka_up")
+aoi_icon_file = st.sidebar.file_uploader("アオイのアイコン", type=["png", "jpg", "jpeg"], key="aoi_up")
+noa_icon_file = st.sidebar.file_uploader("ノアのアイコン", type=["png", "jpg", "jpeg"], key="noa_up")
+user_icon_file = st.sidebar.file_uploader("自分のアイコン", type=["png", "jpg", "jpeg"], key="user_up")
 
 # 画像のアスペクト比を維持して綺麗に正方形クロップする関数
 def process_avatar_fixed(uploaded_file, default_url, key_prefix):
-  if uploaded_file is not None:
-    try:
-      from PIL import Image
-      import io
+    if uploaded_file is not None:
+        try:
+            from PIL import Image
+            import io
+            image = Image.open(uploaded_file)
+            image = image.convert("RGB")
+            width, height = image.size
+            st.sidebar.markdown(f"**{uploaded_file.name} の調整**")
+            zoom = st.sidebar.slider("ズーム (拡大)", 1.0, 3.0, 1.2, 0.1, key=f"{key_prefix}_zoom")
+            min_side = min(width, height)
+            crop_size = int(min_side / zoom)
+            max_x = max(0, width - crop_size)
+            max_y = max(0, height - crop_size)
+            offset_x = (st.sidebar.slider("左右の位置", 0, max(1, max_x), max_x // 2, key=f"{key_prefix}_x") if max_x > 0 else 0)
+            offset_y = (st.sidebar.slider("上下の位置", 0, max(1, max_y), max_y // 2, key=f"{key_prefix}_y") if max_y > 0 else 0)
+            cropped = image.crop((offset_x, offset_y, offset_x + crop_size, offset_y + crop_size))
+            cropped = cropped.resize((200, 200), Image.Resampling.LANCZOS)
+            buffered = io.BytesIO()
+            cropped.save(buffered, format="JPEG")
+            encoded = base64.b64encode(buffered.getvalue()).decode("utf-8")
+            return f"data:image/jpeg;base64,{encoded}"
+        except Exception:
+            bytes_data = uploaded_file.getvalue()
+            encoded = base64.b64encode(bytes_data).decode("utf-8")
+            return f"data:image/jpeg;base64,{encoded}"
+    return default_url
 
-      image = Image.open(uploaded_file)
-      image = image.convert("RGB")
-      width, height = image.size
+# --- セッションステートにアイコンを永続化保存する処理 ---
+if "yuuka_avatar" not in st.session_state:
+    st.session_state.yuuka_avatar = default_ai_icon
+if "aoi_avatar" not in st.session_state:
+    st.session_state.aoi_avatar = default_ai_icon
+if "noa_avatar" not in st.session_state:
+    st.session_state.noa_avatar = default_ai_icon
+if "user_avatar" not in st.session_state:
+    st.session_state.user_avatar = user_default_icon
 
-      st.sidebar.markdown(f"**{uploaded_file.name} の調整**")
-      zoom = st.sidebar.slider(
-          "ズーム (拡大)", 1.0, 3.0, 1.2, 0.1, key=f"{key_prefix}_zoom"
-      )
+# 新しくファイルがアップロードされた場合のみ、アイコンデータを更新してセッションに保持
+if yuuka_icon_file is not None:
+    st.session_state.yuuka_avatar = process_avatar_fixed(yuuka_icon_file, default_ai_icon, "yuuka")
+if aoi_icon_file is not None:
+    st.session_state.aoi_avatar = process_avatar_fixed(aoi_icon_file, default_ai_icon, "aoi")
+if noa_icon_file is not None:
+    st.session_state.noa_avatar = process_avatar_fixed(noa_icon_file, default_ai_icon, "noa")
+if user_icon_file is not None:
+    st.session_state.user_avatar = process_avatar_fixed(user_icon_file, user_default_icon, "user")
 
-      min_side = min(width, height)
-      crop_size = int(min_side / zoom)
-
-      max_x = max(0, width - crop_size)
-      max_y = max(0, height - crop_size)
-
-      offset_x = (
-          st.sidebar.slider(
-              "左右の位置", 0, max(1, max_x), max_x // 2, key=f"{key_prefix}_x"
-          )
-          if max_x > 0
-          else 0
-      )
-      offset_y = (
-          st.sidebar.slider(
-              "上下の位置", 0, max(1, max_y), max_y // 2, key=f"{key_prefix}_y"
-          )
-          if max_y > 0
-          else 0
-      )
-
-      cropped = image.crop(
-          (offset_x, offset_y, offset_x + crop_size, offset_y + crop_size)
-      )
-      cropped = cropped.resize((200, 200), Image.Resampling.LANCZOS)
-
-      buffered = io.BytesIO()
-      cropped.save(buffered, format="JPEG")
-      encoded = base64.b64encode(buffered.getvalue()).decode("utf-8")
-      return f"data:image/jpeg;base64,{encoded}"
-    except Exception:
-      bytes_data = uploaded_file.getvalue()
-      encoded = base64.b64encode(bytes_data).decode("utf-8")
-      return f"data:image/jpeg;base64,{encoded}"
-  return default_url
-
-
-yuuka_avatar_path = process_avatar_fixed(
-    yuuka_icon_file, default_ai_icon, "yuuka"
-)
-aoi_avatar_path = process_avatar_fixed(aoi_icon_file, default_ai_icon, "aoi")
-noa_avatar_path = process_avatar_fixed(noa_icon_file, default_ai_icon, "noa")
-user_avatar_path = process_avatar_fixed(
-    user_icon_file, user_default_icon, "user"
-)
+# 以降のコードで使用するアバターパスをセッションから取得
+yuuka_avatar_path = st.session_state.yuuka_avatar
+aoi_avatar_path = st.session_state.aoi_avatar
+noa_avatar_path = st.session_state.noa_avatar
+user_avatar_path = st.session_state.user_avatar
 
 
 def get_character_avatar(char_name):
