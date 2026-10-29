@@ -135,7 +135,7 @@ def process_avatar_fixed(uploaded_file, default_url, key_prefix):
             return f"data:image/jpeg;base64,{encoded}"
     return default_url
 
-# --- セッションステートにアイコンを永続化保存する処理 ---
+# --- セッションステートにアイコンを永続化保存する処理（初期化） ---
 if "yuuka_avatar" not in st.session_state:
     st.session_state.yuuka_avatar = default_ai_icon
 if "aoi_avatar" not in st.session_state:
@@ -145,7 +145,7 @@ if "noa_avatar" not in st.session_state:
 if "user_avatar" not in st.session_state:
     st.session_state.user_avatar = user_default_icon
 
-# 新しくファイルがアップロードされた場合のみ、アイコンデータを更新してセッションに保持
+# ファイルがアップロードされた場合、即座に処理してセッションに恒久保存する
 if yuuka_icon_file is not None:
     st.session_state.yuuka_avatar = process_avatar_fixed(yuuka_icon_file, default_ai_icon, "yuuka")
 if aoi_icon_file is not None:
@@ -155,22 +155,16 @@ if noa_icon_file is not None:
 if user_icon_file is not None:
     st.session_state.user_avatar = process_avatar_fixed(user_icon_file, user_default_icon, "user")
 
-# 以降のコードで使用するアバターパスをセッションから取得
-yuuka_avatar_path = st.session_state.yuuka_avatar
-aoi_avatar_path = st.session_state.aoi_avatar
-noa_avatar_path = st.session_state.noa_avatar
-user_avatar_path = st.session_state.user_avatar
-
 
 def get_character_avatar(char_name):
   if "ユウカ" in char_name:
-    return yuuka_avatar_path
+    return st.session_state.yuuka_avatar
   elif "アオイ" in char_name:
-    return aoi_avatar_path
+    return st.session_state.aoi_avatar
   elif "ノア" in char_name:
-    return noa_avatar_path
+    return st.session_state.noa_avatar
   else:
-    return default_ai_icon
+    return st.session_state.yuuka_avatar
 
 
 if st.sidebar.button("🗑️ チャット履歴をクリア"):
@@ -181,7 +175,7 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# AIの返信メッセージを解析して描画する関数（修正版）
+# AIの返信メッセージを解析して描画する関数
 def render_ai_message(content):
   cleaned = content.strip()
 
@@ -290,7 +284,7 @@ def render_ai_message(content):
   st.markdown(
       f"""
       <div class="chat-row ai">
-          <img src="{yuuka_avatar_path}" class="avatar">
+          <img src="{st.session_state.yuuka_avatar}" class="avatar">
           <div class="bubble-container">
               <div class="sender-name">ユウカ</div>
               <div class="bubble">{content}</div>
@@ -307,7 +301,7 @@ for msg in st.session_state.messages:
     st.markdown(
         f"""
         <div class="chat-row user">
-            <img src="{user_avatar_path}" class="avatar">
+            <img src="{st.session_state.user_avatar}" class="avatar">
             <div class="bubble-container">
                 <div class="sender-name">あなた</div>
                 <div class="bubble">{msg["content"]}</div>
@@ -328,7 +322,7 @@ if prompt := st.chat_input("メッセージを入力... (ユウカ、アオイ�
     st.markdown(
         f"""
         <div class="chat-row user">
-            <img src="{user_avatar_path}" class="avatar">
+            <img src="{st.session_state.user_avatar}" class="avatar">
             <div class="bubble-container">
                 <div class="sender-name">あなた</div>
                 <div class="bubble">{prompt}</div>
