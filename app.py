@@ -135,7 +135,7 @@ def process_avatar_fixed(uploaded_file, default_url, key_prefix):
             return f"data:image/jpeg;base64,{encoded}"
     return default_url
 
-# --- セッションステートにアイコンを永続化保存する処理（確実な維持・リロード対策） ---
+# --- セッションステートにアイコンを永続化保存する処理（リロード対策万全版） ---
 if "yuuka_avatar" not in st.session_state:
     st.session_state.yuuka_avatar = default_ai_icon
 if "aoi_avatar" not in st.session_state:
@@ -145,7 +145,7 @@ if "noa_avatar" not in st.session_state:
 if "user_avatar" not in st.session_state:
     st.session_state.user_avatar = user_default_icon
 
-# 新しくファイルがアップロードされたときだけ変換してセッションを上書きする
+# 新しくファイルがアップロードされたときだけ処理してセッションを更新する
 if yuuka_icon_file is not None:
     st.session_state.yuuka_avatar = process_avatar_fixed(yuuka_icon_file, default_ai_icon, "yuuka")
 if aoi_icon_file is not None:
@@ -158,11 +158,11 @@ if user_icon_file is not None:
 
 # キャラクター名に応じたアイコンを確実に取り出す関数
 def get_character_avatar(char_name):
-  if "アオイ" in char_name:
+  if "アオイ" in str(char_name):
     return st.session_state.aoi_avatar
-  elif "ノア" in char_name:
+  elif "ノア" in str(char_name):
     return st.session_state.noa_avatar
-  elif "ユウカ" in char_name:
+  elif "ユウカ" in str(char_name):
     return st.session_state.yuuka_avatar
   else:
     return st.session_state.yuuka_avatar
@@ -193,6 +193,16 @@ def render_ai_message(content):
       if isinstance(parsed, dict):
         display_text = parsed.get("message", content)
         char_name = parsed.get("Name", "ユウカ")
+        
+        # 万が一JSON内のNameが空だった場合の防護策
+        if not char_name or char_name not in ["ユウカ", "アオイ", "ノア"]:
+          if "アオイ" in cleaned:
+            char_name = "アオイ"
+          elif "ノア" in cleaned:
+            char_name = "ノア"
+          else:
+            char_name = "ユウカ"
+
         time_val = parsed.get("Time", "")
         loc_val = parsed.get("Location", "")
         outfit = parsed.get("Outfit", "")
@@ -281,7 +291,7 @@ def render_ai_message(content):
       )
     return
 
-  # 3. どちらにも当てはまらない通常のテキストの場合（本文に含まれる名前からアイコンを推測）
+  # 3. どちらにも当てはまらない通常のテキストの場合
   detected_name = "ユウカ"
   if "アオイ" in content:
     detected_name = "アオイ"
