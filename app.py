@@ -135,7 +135,7 @@ def process_avatar_fixed(uploaded_file, default_url, key_prefix):
             return f"data:image/jpeg;base64,{encoded}"
     return default_url
 
-# --- セッションステートにアイコンを永続化保存する処理（初期化） ---
+# --- セッションステートにアイコンを永続化保存する処理（修正：リロード時に消えないように分離） ---
 if "yuuka_avatar" not in st.session_state:
     st.session_state.yuuka_avatar = default_ai_icon
 if "aoi_avatar" not in st.session_state:
@@ -145,7 +145,7 @@ if "noa_avatar" not in st.session_state:
 if "user_avatar" not in st.session_state:
     st.session_state.user_avatar = user_default_icon
 
-# ファイルがアップロードされた場合、即座に処理してセッションに恒久保存する
+# 新しくファイルがアップロードされたときだけ処理してセッションを上書きする
 if yuuka_icon_file is not None:
     st.session_state.yuuka_avatar = process_avatar_fixed(yuuka_icon_file, default_ai_icon, "yuuka")
 if aoi_icon_file is not None:
