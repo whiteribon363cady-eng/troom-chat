@@ -186,12 +186,9 @@ def generate_image_from_hf(prompt_text):
 
 
 def render_ai_message(content):
-  cleaned = content.strip()
+  cleaned = str(content).strip()
 
-  cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
-  cleaned = re.sub(r"\s*```$", "", cleaned)
-  cleaned = cleaned.strip()
-
+  # 思考ログや余計な文章が前にあっても、最初の `{` から最後の `}` までを強制抽出する
   start_idx = cleaned.find("{")
   end_idx = cleaned.rfind("}")
 
@@ -246,6 +243,7 @@ def render_ai_message(content):
     )
     return
 
+  # もし万が一JSONが取れなかった場合のフォールバック（思考ログの英文を非表示にする）
   detected_name = "ユウカ"
   if "アオイ" in content:
     detected_name = "アオイ"
