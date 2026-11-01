@@ -54,6 +54,7 @@ st.sidebar.markdown("### 🖼️ アイコン設定")
 default_ai_icon = "https://api.iconify.design/noto:girl.svg"
 user_default_icon = "https://api.iconify.design/noto:boy.svg"
 
+# アイコン用画像をアップロード
 yuuka_icon_file = st.sidebar.file_uploader(
     "ユウカのアイコン", type=["png", "jpg", "jpeg"], key="yuuka_up"
 )
@@ -68,6 +69,7 @@ user_icon_file = st.sidebar.file_uploader(
 )
 
 
+# 画像のアスペクト比を維持して綺麗に正方形クロップする関数
 def process_avatar_fixed(uploaded_file, default_url, key_prefix):
   if uploaded_file is not None:
     try:
@@ -119,6 +121,7 @@ def process_avatar_fixed(uploaded_file, default_url, key_prefix):
   return default_url
 
 
+# セッションステートにアイコンを永続化保存する処理
 if "yuuka_avatar" not in st.session_state:
   st.session_state.yuuka_avatar = default_ai_icon
 if "aoi_avatar" not in st.session_state:
@@ -146,12 +149,14 @@ if user_icon_file is not None:
   )
 
 
+# キャラクター名に応じたアイコン画像（Base64等）を取り出す関数
 def get_character_avatar(char_name):
-  if "アオイ" in str(char_name):
+  c_name = str(char_name).strip()
+  if "アオイ" in c_name:
     return st.session_state.aoi_avatar
-  elif "ノア" in str(char_name):
+  elif "ノア" in c_name:
     return st.session_state.noa_avatar
-  elif "ユウカ" in str(char_name):
+  elif "ユウカ" in c_name:
     return st.session_state.yuuka_avatar
   else:
     return st.session_state.yuuka_avatar
@@ -165,6 +170,7 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
+# Hugging Face APIを直接叩いて画像生成する関数
 def generate_image_from_hf(prompt_text):
   if not hf_token:
     return None
@@ -185,10 +191,11 @@ def generate_image_from_hf(prompt_text):
   return None
 
 
+# AIからのメッセージを解析して描画する関数
 def render_ai_message(content):
   cleaned = str(content).strip()
 
-  # 思考ログや余計な文章が前にあっても、最初の `{` から最後の `}` までを強制抽出する
+  # 思考ログや不要な文章を無視して最初の `{` から最後の `}` までを抽出
   start_idx = cleaned.find("{")
   end_idx = cleaned.rfind("}")
 
@@ -224,6 +231,8 @@ def render_ai_message(content):
         if loc_val or time_val
         else None
     )
+
+    # キャラクター名に応じた正しいアオイ・ユウカ・ノアのアイコンを取得
     current_avatar = get_character_avatar(char_name)
 
     img_html = f'<img src="{img_url}" class="chat-img">' if img_url else ""
@@ -243,7 +252,7 @@ def render_ai_message(content):
     )
     return
 
-  # もし万が一JSONが取れなかった場合のフォールバック（思考ログの英文を非表示にする）
+  # JSONでなかった場合のフォールバック
   detected_name = "ユウカ"
   if "アオイ" in content:
     detected_name = "アオイ"
@@ -265,6 +274,7 @@ def render_ai_message(content):
   )
 
 
+# 過去のメッセージの描画
 for msg in st.session_state.messages:
   if msg["role"] == "user":
     st.markdown(
@@ -282,6 +292,7 @@ for msg in st.session_state.messages:
   else:
     render_ai_message(msg["content"])
 
+# チャット入力
 if prompt := st.chat_input("メッセージを入力... (ユウカ、アオイ、ノアなど)"):
   if not api_key:
     st.sidebar.error("左側のメニューからDify APIキーを入力してください。")
