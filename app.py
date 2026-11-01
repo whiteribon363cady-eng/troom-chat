@@ -69,7 +69,6 @@ user_icon_file = st.sidebar.file_uploader(
 )
 
 
-# 画像のアスペクト比を維持して綺麗に正方形クロップする関数
 def process_avatar_fixed(uploaded_file, default_url, key_prefix):
   if uploaded_file is not None:
     try:
@@ -121,7 +120,6 @@ def process_avatar_fixed(uploaded_file, default_url, key_prefix):
   return default_url
 
 
-# セッションステートにアイコンを永続化保存する処理
 if "yuuka_avatar" not in st.session_state:
   st.session_state.yuuka_avatar = default_ai_icon
 if "aoi_avatar" not in st.session_state:
@@ -149,7 +147,6 @@ if user_icon_file is not None:
   )
 
 
-# キャラクター名に応じたアイコンを取り出す関数
 def get_character_avatar(char_name):
   if "アオイ" in str(char_name):
     return st.session_state.aoi_avatar
@@ -169,7 +166,6 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# Python側からHugging Faceの画像生成APIを直接叩いてbase64画像に変換する関数
 def generate_image_from_hf(prompt_text):
   if not hf_token:
     return None
@@ -190,86 +186,77 @@ def generate_image_from_hf(prompt_text):
   return None
 
 
-# AIの返信メッセージを解析して描画する関数（強力なフィルタリング付き）
+# 超強力フィルタリング付きAIメッセージ描画関数
 def render_ai_message(content):
   cleaned = content.strip()
 
-  # 1. LLMが混ぜてしまった英語の思考プロセス（"We need to..." など）が冒頭にある場合、最初のJSONの開き括弧 `{` までを全てカットする
-  json_match_idx = cleaned.find("{")
-  if json_match_idx > 0:
-    cleaned = cleaned[json_match_idx:]
+  # Markdownのコードブロック（```json ... ``` や ```）があればまず剥ぎ取る
+  cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
+  cleaned = re.sub(r"\s*```$", "", cleaned)
+  cleaned = cleaned.strip()
 
-  # Markdownのコードブロック（```json ... ```）で囲まれていたら剥ぎ取る
-  if cleaned.startswith("```"):
-    cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
-    cleaned = re.sub(r"\s*```$", "", cleaned)
-    cleaned = cleaned.strip()
+  # 最初の `{` から最後の `}` までだけをJSONとして強制的に切り出す（余計な英語思考ログを完全に無視する）
+  start_idx = cleaned.find("{")
+  end_idx = cleaned.rfind("}")
 
-  # 2. 個別指定のJSON形式の場合
-  if cleaned.startswith("{") and cleaned.endswith("}"):
+  parsed = None
+  if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+    json_candidate = cleaned[start_idx : end_idx + 1]
     try:
-      parsed = json.loads(cleaned)
-      if isinstance(parsed, dict):
-        display_text = parsed.get("message", content)
-        char_name = parsed.get("Name", "ユウカ")
-        if not char_name or char_name not in ["ユウカ", "アオイ", "ノア"]:
-          if "アオイ" in cleaned:
-            char_name = "アオイ"
-          elif "ノア" in cleaned:
-            char_name = "ノア"
-          else:
-            char_name = "ユウカ"
-
-        time_val = parsed.get("Time", "")
-        loc_val = parsed.get("Location", "")
-        outfit = parsed.get("Outfit", "")
-        expr = parsed.get("Expression", "")
-        img_url = parsed.get("Image", "")
-
-        # URLではない場合はHFで画像生成を試みる
-        if (
-            img_url
-            and not img_url.startswith("http")
-            and not img_url.startswith("data:")
-        ):
-          generated_img = generate_image_from_hf(img_url)
-          if generated_img:
-            img_url = generated_img
-
-        meta_info = (
-            f"📍 {loc_val} | ⏰ {time_val} | 👗 {outfit} | ✨ {expr}"
-            if loc_val or time_val
-            else None
-        )
-        current_avatar = get_character_avatar(char_name)
-
-        img_html = (
-            f'<img src="{img_url}" class="chat-img">'
-            if img_url and (img_url.startswith("http") or img_url.startswith("data:"))
-            else ""
-        )
-        meta_html = (
-            f'<div class="meta-box">{meta_info}</div>' if meta_info else ""
-        )
-
-        st.markdown(
-            f"""
-                <div class="chat-row ai">
-                    <img src="{current_avatar}" class="avatar">
-                    <div class="bubble-container">
-                        <div class="sender-name">{char_name}</div>
-                        <div class="bubble">{img_html}{display_text}{meta_html}</div>
-                    </div>
-                </div>
-                """,
-            unsafe_allow_html=True,
-        )
-        return
+      parsed = json.loads(json_candidate)
     except Exception:
       pass
 
-  # 3. 通常テキストやパースしきれなかった場合のフォールバック（思考ログの英文を非表示にする）
-  # 英語の長文思考ログが含まれている場合は「Message:」以降や日本語の部分だけを抽出する
+  # もしJSONとして正常にパースできたら、そこから各項目を取り出す
+  if isinstance(parsed, dict):
+    display_text = parsed.get("message", "（メッセージがありません）")
+    char_name = parsed.get("Name", "ユウカ")
+    time_val = parsed.get("Time", "")
+    loc_val = parsed.get("Location", "")
+    outfit = parsed.get("Outfit", "")
+    expr = parsed.get("Expression", "")
+    img_url = parsed.get("Image", "")
+
+    # 画像URLが通常のプロンプト文字列ならHFで画像生成
+    if (
+        img_url
+        and not img_url.startswith("http")
+        and not img_url.startswith("data:")
+    ):
+      generated_img = generate_image_from_hf(img_url)
+      if generated_img:
+        img_url = generated_img
+
+    meta_info = (
+        f"📍 {loc_val} | ⏰ {time_val} | 👗 {outfit} | ✨ {expr}"
+        if loc_val or time_val
+        else None
+    )
+    current_avatar = get_character_avatar(char_name)
+
+    img_html = (
+        f'<img src="{img_url}" class="chat-img">'
+        if img_url and (img_url.startswith("http") or img_url.startswith("data:"))
+        else ""
+    )
+    meta_html = f'<div class="meta-box">{meta_info}</div>' if meta_info else ""
+
+    st.markdown(
+        f"""
+            <div class="chat-row ai">
+                <img src="{current_avatar}" class="avatar">
+                <div class="bubble-container">
+                    <div class="sender-name">{char_name}</div>
+                    <div class="bubble">{img_html}{display_text}{meta_html}</div>
+                </div>
+            </div>
+            """,
+        unsafe_allow_html=True,
+    )
+    return
+
+  # JSONとしてパースできなかった場合のフォールバック（思考ログの英文などをすべて除去）
+  # 日本語のセリフ部分やMessage部分だけを救出する
   if "Message:" in cleaned:
     try:
       parts = cleaned.split("Message:")
@@ -278,13 +265,14 @@ def render_ai_message(content):
     except Exception:
       pass
 
+  # 万が一英語の長文（We need to...など）が残っていたら、日本語以外のゴミとして非表示にするか綺麗にする
   detected_name = "ユウカ"
   if "アオイ" in content:
     detected_name = "アオイ"
   elif "ノア" in content:
     detected_name = "ノア"
-  current_avatar = get_character_avatar(detected_name)
 
+  current_avatar = get_character_avatar(detected_name)
   st.markdown(
       f"""
         <div class="chat-row ai">
