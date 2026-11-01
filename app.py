@@ -54,7 +54,6 @@ st.sidebar.markdown("### 🖼️ アイコン設定")
 default_ai_icon = "https://api.iconify.design/noto:girl.svg"
 user_default_icon = "https://api.iconify.design/noto:boy.svg"
 
-# アイコン用画像をアップロード
 yuuka_icon_file = st.sidebar.file_uploader(
     "ユウカのアイコン", type=["png", "jpg", "jpeg"], key="yuuka_up"
 )
@@ -186,16 +185,16 @@ def generate_image_from_hf(prompt_text):
   return None
 
 
-# 超強力フィルタリング付きAIメッセージ描画関数
+# 完璧なJSONパースと画像生成を行うメッセージ描画関数
 def render_ai_message(content):
   cleaned = content.strip()
 
-  # Markdownのコードブロック（```json ... ``` や ```）があればまず剥ぎ取る
+  # Markdownのコードブロックがあれば剥ぎ取る
   cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
   cleaned = re.sub(r"\s*```$", "", cleaned)
   cleaned = cleaned.strip()
 
-  # 最初の `{` から最後の `}` までだけをJSONとして強制的に切り出す（余計な英語思考ログを完全に無視する）
+  # JSONの開始位置と終了位置を綺麗に切り出す
   start_idx = cleaned.find("{")
   end_idx = cleaned.rfind("}")
 
@@ -207,7 +206,6 @@ def render_ai_message(content):
     except Exception:
       pass
 
-  # もしJSONとして正常にパースできたら、そこから各項目を取り出す
   if isinstance(parsed, dict):
     display_text = parsed.get("message", "（メッセージがありません）")
     char_name = parsed.get("Name", "ユウカ")
@@ -215,17 +213,19 @@ def render_ai_message(content):
     loc_val = parsed.get("Location", "")
     outfit = parsed.get("Outfit", "")
     expr = parsed.get("Expression", "")
-    img_url = parsed.get("Image", "")
 
-    # 画像URLが通常のプロンプト文字列ならHFで画像生成
-    if (
-        img_url
-        and not img_url.startswith("http")
-        and not img_url.startswith("data:")
-    ):
-      generated_img = generate_image_from_hf(img_url)
-      if generated_img:
-        img_url = generated_img
+    # Dify側から `image_prompt` または `Image` として渡されるプロンプトを取得
+    img_prompt = parsed.get("image_prompt", "") or parsed.get("Image", "")
+
+    img_url = ""
+    # もしプロンプトが存在し、URLでない場合はHugging Faceで画像を生成する
+    if img_prompt:
+      if img_prompt.startswith("http") or img_prompt.startswith("data:"):
+        img_url = img_prompt
+      else:
+        generated_img = generate_image_from_hf(img_prompt)
+        if generated_img:
+          img_url = generated_img
 
     meta_info = (
         f"📍 {loc_val} | ⏰ {time_val} | 👗 {outfit} | ✨ {expr}"
@@ -234,11 +234,7 @@ def render_ai_message(content):
     )
     current_avatar = get_character_avatar(char_name)
 
-    img_html = (
-        f'<img src="{img_url}" class="chat-img">'
-        if img_url and (img_url.startswith("http") or img_url.startswith("data:"))
-        else ""
-    )
+    img_html = f'<img src="{img_url}" class="chat-img">' if img_url else ""
     meta_html = f'<div class="meta-box">{meta_info}</div>' if meta_info else ""
 
     st.markdown(
@@ -255,17 +251,7 @@ def render_ai_message(content):
     )
     return
 
-  # JSONとしてパースできなかった場合のフォールバック（思考ログの英文などをすべて除去）
-  # 日本語のセリフ部分やMessage部分だけを救出する
-  if "Message:" in cleaned:
-    try:
-      parts = cleaned.split("Message:")
-      if len(parts) > 1:
-        cleaned = parts[1].strip().strip('"')
-    except Exception:
-      pass
-
-  # 万が一英語の長文（We need to...など）が残っていたら、日本語以外のゴミとして非表示にするか綺麗にする
+  # パースできなかった場合のフォールバック
   detected_name = "ユウカ"
   if "アオイ" in content:
     detected_name = "アオイ"
@@ -337,7 +323,7 @@ if prompt := st.chat_input("メッセージを入力... (ユウカ、アオイ�
     }
 
     try:
-      with st.spinner("考えています..."):
+      with st.spinner("考えています...（画像生成中含む）"):
         response = requests.post(
             f"{api_base_url}/chat-messages", headers=headers, json=payload
         )
