@@ -149,7 +149,7 @@ if user_icon_file is not None:
   )
 
 
-# キャラクター名に応じたアイコン画像（Base64等）を取り出す関数
+# キャラクター名に応じたアイコン画像を取り出す関数
 def get_character_avatar(char_name):
   c_name = str(char_name).strip()
   if "アオイ" in c_name:
@@ -195,7 +195,7 @@ def generate_image_from_hf(prompt_text):
 def render_ai_message(content):
   cleaned = str(content).strip()
 
-  # 思考ログや不要な文章を無視して最初の `{` から最後の `}` までを抽出
+  # 思考ログや余計な文章が前にあっても、最初の `{` から最後の `}` までを強制抽出する
   start_idx = cleaned.find("{")
   end_idx = cleaned.rfind("}")
 
@@ -232,7 +232,7 @@ def render_ai_message(content):
         else None
     )
 
-    # キャラクター名に応じた正しいアオイ・ユウカ・ノアのアイコンを取得
+    # キャラクター名に応じた正しいアイコンを取得
     current_avatar = get_character_avatar(char_name)
 
     img_html = f'<img src="{img_url}" class="chat-img">' if img_url else ""
@@ -252,7 +252,7 @@ def render_ai_message(content):
     )
     return
 
-  # JSONでなかった場合のフォールバック
+  # 万が一JSONが取れなかった場合のフォールバック
   detected_name = "ユウカ"
   if "アオイ" in content:
     detected_name = "アオイ"
