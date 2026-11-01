@@ -217,7 +217,7 @@ def render_ai_message(content):
 
     img_prompt = parsed.get("image_prompt", "") or parsed.get("Image", "")
 
-    # ★ ここでキャラクター名（ユウカ・アオイ・ノア）と画像生成プロンプトを連動させる
+    # ★ キャラクター名（ユウカ・アオイ・ノア）に合わせた画像生成プロンプトの自動連動
     if img_prompt:
       c_name = str(char_name).strip()
       if "アオイ" in c_name:
