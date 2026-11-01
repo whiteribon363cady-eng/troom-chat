@@ -185,16 +185,13 @@ def generate_image_from_hf(prompt_text):
   return None
 
 
-# 完璧なJSONパースと画像生成を行うメッセージ描画関数
 def render_ai_message(content):
   cleaned = content.strip()
 
-  # Markdownのコードブロックがあれば剥ぎ取る
   cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
   cleaned = re.sub(r"\s*```$", "", cleaned)
   cleaned = cleaned.strip()
 
-  # JSONの開始位置と終了位置を綺麗に切り出す
   start_idx = cleaned.find("{")
   end_idx = cleaned.rfind("}")
 
@@ -214,11 +211,9 @@ def render_ai_message(content):
     outfit = parsed.get("Outfit", "")
     expr = parsed.get("Expression", "")
 
-    # Dify側から `image_prompt` または `Image` として渡されるプロンプトを取得
     img_prompt = parsed.get("image_prompt", "") or parsed.get("Image", "")
 
     img_url = ""
-    # もしプロンプトが存在し、URLでない場合はHugging Faceで画像を生成する
     if img_prompt:
       if img_prompt.startswith("http") or img_prompt.startswith("data:"):
         img_url = img_prompt
@@ -251,7 +246,6 @@ def render_ai_message(content):
     )
     return
 
-  # パースできなかった場合のフォールバック
   detected_name = "ユウカ"
   if "アオイ" in content:
     detected_name = "アオイ"
@@ -273,7 +267,6 @@ def render_ai_message(content):
   )
 
 
-# 過去のメッセージの描画
 for msg in st.session_state.messages:
   if msg["role"] == "user":
     st.markdown(
@@ -291,7 +284,6 @@ for msg in st.session_state.messages:
   else:
     render_ai_message(msg["content"])
 
-# チャット入力
 if prompt := st.chat_input("メッセージを入力... (ユウカ、アオイ、ノアなど)"):
   if not api_key:
     st.sidebar.error("左側のメニューからDify APIキーを入力してください。")
