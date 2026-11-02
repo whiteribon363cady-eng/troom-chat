@@ -38,13 +38,14 @@ api_key = st.sidebar.text_input(
 api_base_url = st.sidebar.text_input("API Base URL", value="https://api.dify.ai/v1")
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 🎨 Hugging Face 画像生成設定")
+st.sidebar.markdown("### 🎨 Hugging Face Space 設定 (高速生成)")
 hf_token = st.sidebar.text_input(
     "Hugging Face トークン", type="password", value=""
 )
-hf_model = st.sidebar.text_input(
-    "Stable Diffusion モデル",
-    value="runwayml/stable-diffusion-v1-5",
+# 高速な画像生成Spaceのリポジトリ名（例）
+hf_space_model = st.sidebar.text_input(
+    "Gradio Space ID",
+    value="stabilityai/stable-diffusion-3-medium",
 )
 
 st.sidebar.markdown("---")
@@ -52,7 +53,6 @@ st.sidebar.markdown("### 🖼️ アイコン設定")
 default_ai_icon = "https://api.iconify.design/noto:girl.svg"
 user_default_icon = "https://api.iconify.design/noto:boy.svg"
 
-# アイコン用画像をアップロード
 yuuka_icon_file = st.sidebar.file_uploader(
     "ユウカのアイコン", type=["png", "jpg", "jpeg"], key="yuuka_up"
 )
@@ -119,7 +119,6 @@ def process_avatar_fixed(uploaded_file, default_url, key_prefix):
   return default_url
 
 
-# セッションステートにアイコンを永続化保存する処理
 if "yuuka_avatar" not in st.session_state:
   st.session_state.yuuka_avatar = default_ai_icon
 if "aoi_avatar" not in st.session_state:
@@ -147,7 +146,6 @@ if user_icon_file is not None:
   )
 
 
-# キャラクター名に応じたアイコン画像を取り出す関数
 def get_character_avatar(char_name):
   c_name = str(char_name).strip()
   if "アオイ" in c_name:
@@ -168,23 +166,41 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# Hugging Face APIを直接叩いて画像生成する関数
-def generate_image_from_hf(prompt_text):
-  if not hf_token:
+# 【アプローチ1】gradio_client を使った高速な Space バックエンド連携関数
+def generate_image_from_gradio_space(prompt_text):
+  if not hf_space_model:
     return None
-  headers = {
-      "Authorization": f"Bearer {hf_token}",
-      "Content-Type": "application/json",
-  }
-  payload = {"inputs": prompt_text}
-  api_url = f"https://api-inference.huggingface.co/models/{hf_model}"
   try:
-    response = requests.post(api_url, headers=headers, json=payload, timeout=30)
-    if response.status_code == 200:
-      img_bytes = response.content
-      encoded = base64.b64encode(img_bytes).decode("utf-8")
-      return f"data:image/jpeg;base64,{encoded}"
-  except Exception:
+    from gradio_client import Client
+
+    # トークンがある場合は認証付きでクライアントを作成
+    client_kwargs = {}
+    if hf_token:
+      client_kwargs["hf_token"] = hf_token
+
+    client = Client(hf_space_model, **client_kwargs)
+
+    # Space側のエンドポイントや予測メソッドを実行
+    # 一般的なGradio Spaceの予測形式に対応
+    result = client.predict(prompt=prompt_text, api_name="/infer")
+
+    # result がファイルパスの場合の処理
+    img_path = None
+    if isinstance(result, (list, tuple)):
+      img_path = result[0]
+    elif isinstance(result, str):
+      img_path = result
+    elif isinstance(result, dict) and "image" in result:
+      img_path = result["image"]
+
+    if img_path and os.path.exists(img_path):
+      with open(img_path, "rb") as f:
+        img_bytes = f.read()
+        encoded = base64.b64encode(img_bytes).decode("utf-8")
+        return f"data:image/jpeg;base64,{encoded}"
+  except Exception as e:
+    # 万が一失敗してもアプリ全体が固まらないように例外をキャッチしてNoneを返す
+    print(f"Gradio Client Error: {e}")
     pass
   return None
 
@@ -237,7 +253,8 @@ def render_ai_message(content):
       if img_prompt.startswith("http") or img_prompt.startswith("data:"):
         img_url = img_prompt
       else:
-        generated_img = generate_image_from_hf(img_prompt)
+        # ここでGradio Space経由の高速生成関数を呼び出す
+        generated_img = generate_image_from_gradio_space(img_prompt)
         if generated_img:
           img_url = generated_img
 
