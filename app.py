@@ -165,7 +165,7 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# 【安全ガード付き】Ggradio Space 経由の高速画像生成関数
+# 【安全ガード付き】Gradio Space 経由の高速画像生成関数
 def generate_image_from_gradio_space(prompt_text):
   if not hf_space_model:
     return None
@@ -176,7 +176,6 @@ def generate_image_from_gradio_space(prompt_text):
     if hf_token:
       client_kwargs["hf_token"] = hf_token
 
-    # 接続・生成時のタイムアウトやエラーを安全にキャッチする
     client = Client(hf_space_model, **client_kwargs)
     result = client.predict(prompt=prompt_text, api_name="/infer")
 
@@ -194,13 +193,12 @@ def generate_image_from_gradio_space(prompt_text):
         encoded = base64.b64encode(img_bytes).decode("utf-8")
         return f"data:image/jpeg;base64,{encoded}"
   except Exception as e:
-    # 万が一失敗しても処理を止めず、エラーを流してテキスト表示を優先する
     print(f"Gradio Client Safe Catch: {e}")
     pass
   return None
 
 
-# AIからのメッセージを解析して描画する関数
+# AIからのメッセージを解析して描画する関数（JSON崩れ完全対応版）
 def render_ai_message(content):
   cleaned = str(content).strip()
 
@@ -210,6 +208,8 @@ def render_ai_message(content):
   parsed = None
   if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
     json_candidate = cleaned[start_idx : end_idx + 1]
+    # 余分なマークダウン記号などを掃除
+    json_candidate = re.sub(r"```json|```", "", json_candidate).strip()
     try:
       parsed = json.loads(json_candidate)
     except Exception:
@@ -223,32 +223,19 @@ def render_ai_message(content):
     outfit = parsed.get("Outfit", "")
     expr = parsed.get("Expression", "")
 
-    img_prompt = parsed.get("image_prompt", "") or parsed.get("Image", "")
-
-    if img_prompt:
-      c_name = str(char_name).strip()
-      if "アオイ" in c_name:
-        if "aoi" not in img_prompt.lower():
-          img_prompt = (
-              "1girl, aoi from blue archive, high quality, " + img_prompt
-          )
-      elif "ノア" in c_name:
-        if "noa" not in img_prompt.lower():
-          img_prompt = (
-              "1girl, noa from blue archive, high quality, " + img_prompt
-          )
-      else:
-        if "yuka" not in img_prompt.lower():
-          img_prompt = (
-              "1girl, yuka from blue archive, high quality, " + img_prompt
-          )
+    img_prompt = (
+        parsed.get("image_prompt", "")
+        or parsed.get("Image", "")
+        or parsed.get("image", "")
+    )
 
     img_url = ""
     if img_prompt:
+      # URL形式ならそのまま使う
       if img_prompt.startswith("http") or img_prompt.startswith("data:"):
-        img_url = img_prompt
+        # URL末尾のゴミや余分な文字を綺麗に削る
+        img_url = img_prompt.strip().split(" ")[0].rstrip("}")
       else:
-        # ここで生成に失敗しても画面が固まらないようにガード
         generated_img = generate_image_from_gradio_space(img_prompt)
         if generated_img:
           img_url = generated_img
