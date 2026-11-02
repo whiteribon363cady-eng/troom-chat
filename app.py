@@ -10,7 +10,7 @@ from PIL import Image
 # ページの設定
 st.set_page_config(page_title="Ｔroom - LINE風チャット", page_icon="💬", layout="centered")
 
-# スタイリング（LINE風チャット＆丸型アイコン・メタ情報表示用）
+# スタイリング（LINE風チャット＆丸型アイコン用）
 st.markdown(
     """
 <style>
@@ -23,7 +23,6 @@ st.markdown(
 .bubble { padding: 10px 14px; border-radius: 15px; font-size: 15px; line-height: 1.5; word-break: break-all; position: relative; }
 .chat-row.ai .bubble { background-color: #ffffff; color: #333; border-top-left-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
 .chat-row.user .bubble { background-color: #84eb63; color: #000; border-top-right-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-.meta-box { font-size: 11px; color: #888; background-color: #f0f2f5; padding: 6px 10px; border-radius: 8px; margin-top: 8px; border-left: 3px solid #84eb63; }
 .chat-img { width: 100%; max-height: 300px; object-fit: cover; border-radius: 10px; margin-top: 8px; margin-bottom: 4px; }
 </style>
 """,
@@ -38,17 +37,7 @@ api_key = st.sidebar.text_input(
 api_base_url = st.sidebar.text_input("API Base URL", value="https://api.dify.ai/v1")
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 🎨 Hugging Face Space 設定 (高速生成)")
-hf_token = st.sidebar.text_input(
-    "Hugging Face トークン", type="password", value=""
-)
-hf_space_model = st.sidebar.text_input(
-    "Gradio Space ID",
-    value="stabilityai/stable-diffusion-3-medium",
-)
-
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 🖼️ アイコン設定")
+st.sidebar.markdown("### 🖼️ キャラクターアイコン設定")
 default_ai_icon = "https://api.iconify.design/noto:girl.svg"
 user_default_icon = "https://api.iconify.design/noto:boy.svg"
 
@@ -165,39 +154,7 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# Gradio Space 経由の高速画像生成関数
-def generate_image_from_gradio_space(prompt_text):
-  if not hf_space_model:
-    return None
-  try:
-    from gradio_client import Client
-
-    client_kwargs = {}
-    if hf_token:
-      client_kwargs["hf_token"] = hf_token
-    client = Client(hf_space_model, **client_kwargs)
-    result = client.predict(prompt=prompt_text, api_name="/infer")
-
-    img_path = None
-    if isinstance(result, (list, tuple)):
-      img_path = result[0]
-    elif isinstance(result, str):
-      img_path = result
-    elif isinstance(result, dict) and "image" in result:
-      img_path = result["image"]
-
-    if img_path and os.path.exists(img_path):
-      with open(img_path, "rb") as f:
-        img_bytes = f.read()
-        encoded = base64.b64encode(img_bytes).decode("utf-8")
-        return f"data:image/jpeg;base64,{encoded}"
-  except Exception as e:
-    print(f"Gradio Client Error: {e}")
-    pass
-  return None
-
-
-# AIからのメッセージを解析して描画する関数（URLクリーンアップ強化版）
+# AIからのメッセージを解析して描画する関数（メタ情報テキスト非表示・アイコンベース描画）
 def render_ai_message(content):
   cleaned = str(content).strip()
 
@@ -216,41 +173,12 @@ def render_ai_message(content):
   if isinstance(parsed, dict):
     display_text = parsed.get("message", "（メッセージがありません）")
     char_name = parsed.get("Name", "ユウカ")
-    time_val = parsed.get("Time", "")
-    loc_val = parsed.get("Location", "")
-    outfit = parsed.get("Outfit", "")
-    expr = parsed.get("Expression", "")
 
-    img_prompt = (
-        parsed.get("image_prompt", "")
-        or parsed.get("Image", "")
-        or parsed.get("image", "")
-    )
-
-    img_url = ""
-    if img_prompt:
-      # 文字列に変換して前後の不要な記号（波括弧や引用符など）を綺麗に削ぎ落とす
-      raw_prompt = str(img_prompt).strip()
-      raw_prompt = re.sub(r'^["\']|["\']$', "", raw_prompt)  # 前後のクォート削除
-      raw_prompt = raw_prompt.rstrip("}")  # 末尾の波括弧削除
-
-      if raw_prompt.startswith("http") or raw_prompt.startswith("data:"):
-        img_url = raw_prompt.split(" ")[0]
-      else:
-        generated_img = generate_image_from_gradio_space(raw_prompt)
-        if generated_img:
-          img_url = generated_img
-
-    meta_info = (
-        f"📍 {loc_val} | ⏰ {time_val} | 👗 {outfit} | ✨ {expr}"
-        if loc_val or time_val
-        else None
-    )
-
+    # サイドバーで登録された各キャラクターのベースアイコンを取得
     current_avatar = get_character_avatar(char_name)
 
-    img_html = f'<img src="{img_url}" class="chat-img">' if img_url else ""
-    meta_html = f'<div class="meta-box">{meta_info}</div>' if meta_info else ""
+    # 画面下部の余計なメタ情報テキストは一切出さず、アイコンベースの姿を綺麗に表示
+    img_html = f'<img src="{current_avatar}" class="chat-img">'
 
     st.markdown(
         f"""
@@ -258,7 +186,7 @@ def render_ai_message(content):
                 <img src="{current_avatar}" class="avatar">
                 <div class="bubble-container">
                     <div class="sender-name">{char_name}</div>
-                    <div class="bubble">{img_html}{display_text}{meta_html}</div>
+                    <div class="bubble">{img_html}{display_text}</div>
                 </div>
             </div>
             """,
