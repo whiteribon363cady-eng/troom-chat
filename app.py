@@ -155,7 +155,7 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# AIからのメッセージを解析して描画する関数
+# AIからのメッセージを解析し、画像プロンプトから動的生成URLを構築して描画する関数
 def render_ai_message(content):
   cleaned = str(content).strip()
 
@@ -166,6 +166,7 @@ def render_ai_message(content):
     detected_name = "ノア"
 
   display_text = cleaned
+  # デフォルト画像はキャラクターのサイドバーアイコン
   image_url = get_character_avatar(detected_name)
 
   start_idx = cleaned.find("{")
@@ -181,19 +182,42 @@ def render_ai_message(content):
         if "Name" in parsed:
           detected_name = parsed.get("Name")
 
+        # Dify側から「Image」または「image_prompt」として英語の描写やURLを受け取る
         custom_img = (
             parsed.get("Image", "")
             or parsed.get("image", "")
             or parsed.get("image_prompt", "")
         )
+
         if custom_img:
-          clean_url = str(custom_img).strip()
-          clean_url = re.sub(r"^\[.*?\]\((.*?)\)$", r"\1", clean_url)
-          clean_url = clean_url.strip('"').strip("'").rstrip("}").strip()
-          if clean_url.startswith("http") or clean_url.startswith("data:"):
-            image_url = clean_url.split(" ")[0]
+          clean_val = str(custom_img).strip()
+          clean_val = re.sub(r"^\[.*?\]\((.*?)\)$", r"\1", clean_val)
+          clean_val = clean_val.strip('"').strip("'").rstrip("}").strip()
+
+          # すでに有効なURL形式であればそのまま使用
+          if clean_val.startswith("http") or clean_val.startswith("data:"):
+            image_url = clean_val.split(" ")[0]
+          else:
+            # 英語プロンプト等として渡された場合、Pollinations.aiの動的画像生成URLへ自動変換する
+            import urllib.parse
+
+            encoded_prompt = urllib.parse.quote(
+                f"beautiful 31-year-old Japanese woman, {clean_val}, high quality, realistic portrait, detailed lighting"
+            )
+            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=800&height=600&nologo=true"
     except Exception:
       pass
+
+  # 万が一JSONの中に画像指定がない場合でも、セリフやキャラクター状態から動的URLを生成してリッチに演出
+  if image_url == get_character_avatar(detected_name):
+    import urllib.parse
+
+    fallback_desc = (
+        f"beautiful 31-year-old Japanese woman {detected_name}, casual style,"
+        " warm room, smiling, high quality realistic"
+    )
+    encoded_prompt = urllib.parse.quote(fallback_desc)
+    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=800&height=600&nologo=true"
 
   for marker in ["👗", "✨", "📍", "Time:", "Outfit:"]:
     if marker in display_text:
