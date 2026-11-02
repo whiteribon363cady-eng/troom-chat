@@ -1,4 +1,4 @@
 streamlit
 requests
 Pillow
-gradio_clientrequests
+gradio_client
