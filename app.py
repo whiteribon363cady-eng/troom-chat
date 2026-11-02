@@ -42,7 +42,6 @@ st.sidebar.markdown("### 🎨 Hugging Face Space 設定 (高速生成)")
 hf_token = st.sidebar.text_input(
     "Hugging Face トークン", type="password", value=""
 )
-# 高速な画像生成Spaceのリポジトリ名（例）
 hf_space_model = st.sidebar.text_input(
     "Gradio Space ID",
     value="stabilityai/stable-diffusion-3-medium",
@@ -166,25 +165,21 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# 【アプローチ1】gradio_client を使った高速な Space バックエンド連携関数
+# 【安全ガード付き】Ggradio Space 経由の高速画像生成関数
 def generate_image_from_gradio_space(prompt_text):
   if not hf_space_model:
     return None
   try:
     from gradio_client import Client
 
-    # トークンがある場合は認証付きでクライアントを作成
     client_kwargs = {}
     if hf_token:
       client_kwargs["hf_token"] = hf_token
 
+    # 接続・生成時のタイムアウトやエラーを安全にキャッチする
     client = Client(hf_space_model, **client_kwargs)
-
-    # Space側のエンドポイントや予測メソッドを実行
-    # 一般的なGradio Spaceの予測形式に対応
     result = client.predict(prompt=prompt_text, api_name="/infer")
 
-    # result がファイルパスの場合の処理
     img_path = None
     if isinstance(result, (list, tuple)):
       img_path = result[0]
@@ -199,8 +194,8 @@ def generate_image_from_gradio_space(prompt_text):
         encoded = base64.b64encode(img_bytes).decode("utf-8")
         return f"data:image/jpeg;base64,{encoded}"
   except Exception as e:
-    # 万が一失敗してもアプリ全体が固まらないように例外をキャッチしてNoneを返す
-    print(f"Gradio Client Error: {e}")
+    # 万が一失敗しても処理を止めず、エラーを流してテキスト表示を優先する
+    print(f"Gradio Client Safe Catch: {e}")
     pass
   return None
 
@@ -253,7 +248,7 @@ def render_ai_message(content):
       if img_prompt.startswith("http") or img_prompt.startswith("data:"):
         img_url = img_prompt
       else:
-        # ここでGradio Space経由の高速生成関数を呼び出す
+        # ここで生成に失敗しても画面が固まらないようにガード
         generated_img = generate_image_from_gradio_space(img_prompt)
         if generated_img:
           img_url = generated_img
@@ -354,7 +349,7 @@ if prompt := st.chat_input("メッセージを入力... (ユウカ、アオイ�
     }
 
     try:
-      with st.spinner("考えています...（画像生成中含む）"):
+      with st.spinner("考えています...（応答中）"):
         response = requests.post(
             f"{api_base_url}/chat-messages", headers=headers, json=payload
         )
