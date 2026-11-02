@@ -165,7 +165,7 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# 【安全ガード付き】Gradio Space 経由の高速画像生成関数
+# Gradio Space 経由の高速画像生成関数
 def generate_image_from_gradio_space(prompt_text):
   if not hf_space_model:
     return None
@@ -175,7 +175,6 @@ def generate_image_from_gradio_space(prompt_text):
     client_kwargs = {}
     if hf_token:
       client_kwargs["hf_token"] = hf_token
-
     client = Client(hf_space_model, **client_kwargs)
     result = client.predict(prompt=prompt_text, api_name="/infer")
 
@@ -193,12 +192,12 @@ def generate_image_from_gradio_space(prompt_text):
         encoded = base64.b64encode(img_bytes).decode("utf-8")
         return f"data:image/jpeg;base64,{encoded}"
   except Exception as e:
-    print(f"Gradio Client Safe Catch: {e}")
+    print(f"Gradio Client Error: {e}")
     pass
   return None
 
 
-# AIからのメッセージを解析して描画する関数（JSON崩れ完全対応版）
+# AIからのメッセージを解析して描画する関数（URLクリーンアップ強化版）
 def render_ai_message(content):
   cleaned = str(content).strip()
 
@@ -208,7 +207,6 @@ def render_ai_message(content):
   parsed = None
   if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
     json_candidate = cleaned[start_idx : end_idx + 1]
-    # 余分なマークダウン記号などを掃除
     json_candidate = re.sub(r"```json|```", "", json_candidate).strip()
     try:
       parsed = json.loads(json_candidate)
@@ -231,12 +229,15 @@ def render_ai_message(content):
 
     img_url = ""
     if img_prompt:
-      # URL形式ならそのまま使う
-      if img_prompt.startswith("http") or img_prompt.startswith("data:"):
-        # URL末尾のゴミや余分な文字を綺麗に削る
-        img_url = img_prompt.strip().split(" ")[0].rstrip("}")
+      # 文字列に変換して前後の不要な記号（波括弧や引用符など）を綺麗に削ぎ落とす
+      raw_prompt = str(img_prompt).strip()
+      raw_prompt = re.sub(r'^["\']|["\']$', "", raw_prompt)  # 前後のクォート削除
+      raw_prompt = raw_prompt.rstrip("}")  # 末尾の波括弧削除
+
+      if raw_prompt.startswith("http") or raw_prompt.startswith("data:"):
+        img_url = raw_prompt.split(" ")[0]
       else:
-        generated_img = generate_image_from_gradio_space(img_prompt)
+        generated_img = generate_image_from_gradio_space(raw_prompt)
         if generated_img:
           img_url = generated_img
 
