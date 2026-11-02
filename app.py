@@ -166,10 +166,8 @@ def render_ai_message(content):
     detected_name = "ノア"
 
   display_text = cleaned
-  # デフォルトはサイドバーで設定したベースアイコン
   image_url = get_character_avatar(detected_name)
 
-  # Difyからの応答（JSONやシチュエーション情報を含む文字列）を安全にパース
   start_idx = cleaned.find("{")
   end_idx = cleaned.rfind("}")
   if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
@@ -182,27 +180,26 @@ def render_ai_message(content):
         display_text = parsed.get("message", parsed.get("text", display_text))
         if "Name" in parsed:
           detected_name = parsed.get("Name")
-          image_url = get_character_avatar(detected_name)
 
-        # Dify側からその時々のシチュエーション画像URLやプロンプトが指定されていれば優先、なければ登録アイコン
         custom_img = (
             parsed.get("Image", "")
             or parsed.get("image", "")
             or parsed.get("image_prompt", "")
         )
         if custom_img:
-          clean_url = str(custom_img).strip().strip('"').strip("'").rstrip("}")
+          clean_url = str(custom_img).strip()
+          clean_url = re.sub(r"^\[.*?\]\((.*?)\)$", r"\1", clean_url)
+          clean_url = clean_url.strip('"').strip("'").rstrip("}").strip()
           if clean_url.startswith("http") or clean_url.startswith("data:"):
             image_url = clean_url.split(" ")[0]
     except Exception:
       pass
 
-  # 万が一テキスト内にメタ情報が含まれていても、メッセージ部分だけを抽出して余計な文字を出さないようにする
   for marker in ["👗", "✨", "📍", "Time:", "Outfit:"]:
     if marker in display_text:
       display_text = display_text.split(marker)[0].strip()
 
-  # アイコン画像をベースにしつつ、その場のシチュエーションに合わせた画像としてチャット内に綺麗に表示
+  current_avatar = get_character_avatar(detected_name)
   img_html = (
       f'<div class="chat-img-container"><img src="{image_url}"'
       ' class="chat-img"></div>'
@@ -211,7 +208,7 @@ def render_ai_message(content):
   st.markdown(
       f"""
         <div class="chat-row ai">
-            <img src="{get_character_avatar(detected_name)}" class="avatar">
+            <img src="{current_avatar}" class="avatar">
             <div class="bubble-container">
                 <div class="sender-name">{detected_name}</div>
                 <div class="bubble">{img_html}{display_text}</div>
