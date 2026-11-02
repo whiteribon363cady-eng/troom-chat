@@ -10,7 +10,7 @@ from PIL import Image
 # ページの設定
 st.set_page_config(page_title="Ｔroom - LINE風チャット", page_icon="💬", layout="centered")
 
-# スタイリング（LINE風チャット＆丸型アイコン・綺麗に見せるデザイン用）
+# スタイリング（LINE風チャット＆丸型アイコン・画像デザイン用）
 st.markdown(
     """
 <style>
@@ -23,9 +23,8 @@ st.markdown(
 .bubble { padding: 10px 14px; border-radius: 15px; font-size: 15px; line-height: 1.5; word-break: break-all; position: relative; }
 .chat-row.ai .bubble { background-color: #ffffff; color: #333; border-top-left-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
 .chat-row.user .bubble { background-color: #84eb63; color: #000; border-top-right-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-.chat-img-container { position: relative; width: 100%; margin-top: 8px; margin-bottom: 6px; }
+.chat-img-container { position: relative; width: 100%; margin-top: 8px; margin-bottom: 8px; }
 .chat-img { width: 100%; max-height: 280px; object-fit: cover; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-.situation-badge { font-size: 11px; color: #555; background-color: #f8f9fa; padding: 4px 8px; border-radius: 6px; margin-top: 4px; border-left: 3px solid #84eb63; }
 </style>
 """,
     unsafe_allow_html=True,
@@ -156,91 +155,49 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# AIからのメッセージを解析して描画する関数（JSON完全パース＆シチュエーション適応版）
+# AIからのメッセージを解析して描画する関数（シチュエーション適応・メタ文字非表示版）
 def render_ai_message(content):
   cleaned = str(content).strip()
 
-  # JSONのブロックを安全に抽出する
+  detected_name = "ユウカ"
+  if "アオイ" in cleaned:
+    detected_name = "アオイ"
+  elif "ノア" in cleaned:
+    detected_name = "ノア"
+
+  display_text = cleaned
+  avatar_url = get_character_avatar(detected_name)
+
+  # Difyからの応答がJSON（またはそれに近い構造）の場合、綺麗にメッセージと情報を分離する
   start_idx = cleaned.find("{")
   end_idx = cleaned.rfind("}")
-
-  parsed = None
   if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-    json_candidate = cleaned[start_idx : end_idx + 1]
-    json_candidate = re.sub(r"```json|```", "", json_candidate).strip()
     try:
+      json_candidate = re.sub(r"```json|```", "", cleaned[start_idx : end_idx + 1]).strip()
       parsed = json.loads(json_candidate)
+      if isinstance(parsed, dict):
+        display_text = parsed.get("message", parsed.get("text", display_text))
+        if "Name" in parsed:
+          detected_name = parsed.get("Name")
+          avatar_url = get_character_avatar(detected_name)
     except Exception:
       pass
 
-  if isinstance(parsed, dict):
-    display_text = parsed.get("message", "（メッセージがありません）")
-    char_name = parsed.get("Name", "ユウカ")
-    outfit = parsed.get("Outfit", "")
-    expr = parsed.get("Expression", "")
-    loc = parsed.get("Location", "")
+  # 万が一テキスト内にメタ情報が含まれていても、メッセージ部分だけを抽出してすっきりさせる
+  for marker in ["👗", "✨", "📍", "Time:", "Outfit:"]:
+    if marker in display_text:
+      display_text = display_text.split(marker)[0].strip()
 
-    # ベースとなるキャラクターのアイコン画像を取得
-    current_avatar = get_character_avatar(char_name)
+  # キャラクターの顔（アイコン）をベースにしつつ、その場のシチュエーションに沿った表示画像として綺麗に配置
+  img_html = f'<div class="chat-img-container"><img src="{avatar_url}" class="chat-img"></div>'
 
-    # Difyから送られてきた画像URL（もしあれば）を優先し、なければ登録アイコンを利用
-    raw_img = (
-        parsed.get("Image", "")
-        or parsed.get("image", "")
-        or parsed.get("image_prompt", "")
-    )
-    img_url = current_avatar
-
-    if raw_img:
-      clean_img = str(raw_img).strip().strip('"').strip("'").rstrip("}")
-      if clean_img.startswith("http") or clean_img.startswith("data:"):
-        img_url = clean_img.split(" ")[0]
-
-    # シチュエーション（服装や表情）を分かりやすくコンパクトに添える（テキストメタ情報をすっきりさせる）
-    situation_text = ""
-    if outfit or expr:
-      parts = []
-      if outfit:
-        parts.append(f"👗 {outfit}")
-      if expr:
-        parts.append(f"✨ {expr}")
-      if loc:
-        parts.append(f"📍 {loc}")
-      situation_text = (
-          f'<div class="situation-badge">{" / ".join(parts)}</div>'
-      )
-
-    img_html = f'<div class="chat-img-container"><img src="{img_url}" class="chat-img"></div>'
-
-    st.markdown(
-        f"""
-            <div class="chat-row ai">
-                <img src="{current_avatar}" class="avatar">
-                <div class="bubble-container">
-                    <div class="sender-name">{char_name}</div>
-                    <div class="bubble">{img_html}{display_text}{situation_text}</div>
-                </div>
-            </div>
-            """,
-        unsafe_allow_html=True,
-    )
-    return
-
-  # 万が一JSONではない純粋なテキストが来た場合のフォールバック
-  detected_name = "ユウカ"
-  if "アオイ" in content:
-    detected_name = "アオイ"
-  elif "ノア" in content:
-    detected_name = "ノア"
-
-  current_avatar = get_character_avatar(detected_name)
   st.markdown(
       f"""
         <div class="chat-row ai">
-            <img src="{current_avatar}" class="avatar">
+            <img src="{avatar_url}" class="avatar">
             <div class="bubble-container">
                 <div class="sender-name">{detected_name}</div>
-                <div class="bubble">{cleaned}</div>
+                <div class="bubble">{img_html}{display_text}</div>
             </div>
         </div>
         """,
