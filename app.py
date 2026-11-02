@@ -10,7 +10,7 @@ from PIL import Image
 # ページの設定
 st.set_page_config(page_title="Ｔroom - LINE風チャット", page_icon="💬", layout="centered")
 
-# スタイリング（LINE風チャット＆丸型アイコン用）
+# スタイリング（LINE風チャット＆丸型アイコン・綺麗に見せるデザイン用）
 st.markdown(
     """
 <style>
@@ -23,7 +23,9 @@ st.markdown(
 .bubble { padding: 10px 14px; border-radius: 15px; font-size: 15px; line-height: 1.5; word-break: break-all; position: relative; }
 .chat-row.ai .bubble { background-color: #ffffff; color: #333; border-top-left-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
 .chat-row.user .bubble { background-color: #84eb63; color: #000; border-top-right-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-.chat-img { width: 100%; max-height: 300px; object-fit: cover; border-radius: 10px; margin-top: 8px; margin-bottom: 4px; }
+.chat-img-container { position: relative; width: 100%; margin-top: 8px; margin-bottom: 6px; }
+.chat-img { width: 100%; max-height: 280px; object-fit: cover; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.situation-badge { font-size: 11px; color: #555; background-color: #f8f9fa; padding: 4px 8px; border-radius: 6px; margin-top: 4px; border-left: 3px solid #84eb63; }
 </style>
 """,
     unsafe_allow_html=True,
@@ -154,10 +156,11 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# AIからのメッセージを解析して描画する関数（メタ情報テキスト非表示・アイコンベース描画）
+# AIからのメッセージを解析して描画する関数（JSON完全パース＆シチュエーション適応版）
 def render_ai_message(content):
   cleaned = str(content).strip()
 
+  # JSONのブロックを安全に抽出する
   start_idx = cleaned.find("{")
   end_idx = cleaned.rfind("}")
 
@@ -173,12 +176,41 @@ def render_ai_message(content):
   if isinstance(parsed, dict):
     display_text = parsed.get("message", "（メッセージがありません）")
     char_name = parsed.get("Name", "ユウカ")
+    outfit = parsed.get("Outfit", "")
+    expr = parsed.get("Expression", "")
+    loc = parsed.get("Location", "")
 
-    # サイドバーで登録された各キャラクターのベースアイコンを取得
+    # ベースとなるキャラクターのアイコン画像を取得
     current_avatar = get_character_avatar(char_name)
 
-    # 画面下部の余計なメタ情報テキストは一切出さず、アイコンベースの姿を綺麗に表示
-    img_html = f'<img src="{current_avatar}" class="chat-img">'
+    # Difyから送られてきた画像URL（もしあれば）を優先し、なければ登録アイコンを利用
+    raw_img = (
+        parsed.get("Image", "")
+        or parsed.get("image", "")
+        or parsed.get("image_prompt", "")
+    )
+    img_url = current_avatar
+
+    if raw_img:
+      clean_img = str(raw_img).strip().strip('"').strip("'").rstrip("}")
+      if clean_img.startswith("http") or clean_img.startswith("data:"):
+        img_url = clean_img.split(" ")[0]
+
+    # シチュエーション（服装や表情）を分かりやすくコンパクトに添える（テキストメタ情報をすっきりさせる）
+    situation_text = ""
+    if outfit or expr:
+      parts = []
+      if outfit:
+        parts.append(f"👗 {outfit}")
+      if expr:
+        parts.append(f"✨ {expr}")
+      if loc:
+        parts.append(f"📍 {loc}")
+      situation_text = (
+          f'<div class="situation-badge">{" / ".join(parts)}</div>'
+      )
+
+    img_html = f'<div class="chat-img-container"><img src="{img_url}" class="chat-img"></div>'
 
     st.markdown(
         f"""
@@ -186,7 +218,7 @@ def render_ai_message(content):
                 <img src="{current_avatar}" class="avatar">
                 <div class="bubble-container">
                     <div class="sender-name">{char_name}</div>
-                    <div class="bubble">{img_html}{display_text}</div>
+                    <div class="bubble">{img_html}{display_text}{situation_text}</div>
                 </div>
             </div>
             """,
@@ -194,6 +226,7 @@ def render_ai_message(content):
     )
     return
 
+  # 万が一JSONではない純粋なテキストが来た場合のフォールバック
   detected_name = "ユウカ"
   if "アオイ" in content:
     detected_name = "アオイ"
