@@ -155,7 +155,7 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# AIからのメッセージを解析し、思考タグを除去してキャラクターごとに独立した画像を生成する関数
+# AIからのメッセージを解析し、アニメ・イラスト調の画像を動的生成する関数
 def render_ai_message(content):
   cleaned = str(content).strip()
 
@@ -199,24 +199,24 @@ def render_ai_message(content):
             import urllib.parse
 
             c_name = str(detected_name).strip()
-            # キャラクターごとに顔立ちや雰囲気を完全に差別化するベースプロンプト
+            # アニメ・イラスト調に統一されたキャラクターごとのベースプロンプト
             if "アオイ" in c_name:
               char_base = (
-                  "distinct face, 31-year-old Japanese woman Aoi, sharp cool eyes,"
-                  " stylish dark hair, cool and slightly tsundere expression,"
-                  " realistic portrait, high quality"
+                  "beautiful anime style illustration, 31-year-old Japanese woman"
+                  " Aoi, sharp cool eyes, stylish dark hair, cool tsundere"
+                  " expression, high quality anime art"
               )
             elif "ノア" in c_name:
               char_base = (
-                  "distinct face, 31-year-old Japanese woman Noa, soft gentle"
-                  " eyes, soft flowing hair, warm sweet smiling expression,"
-                  " realistic portrait, high quality"
+                  "beautiful anime style illustration, 31-year-old Japanese woman"
+                  " Noa, soft gentle eyes, soft flowing hair, warm sweet smiling"
+                  " expression, high quality anime art"
               )
             else:
               char_base = (
-                  "distinct face, 31-year-old Japanese woman Yuuka, neat elegant"
-                  " dark hair, gentle loving expression, realistic portrait, high"
-                  " quality"
+                  "beautiful anime style illustration, 31-year-old Japanese woman"
+                  " Yuuka, neat elegant dark hair, gentle loving expression, high"
+                  " quality anime art"
               )
 
             combined_prompt = f"{char_base}, {clean_val}"
@@ -225,7 +225,7 @@ def render_ai_message(content):
     except Exception:
       pass
 
-  # フォールバック時もキャラクターごとに完全分離
+  # フォールバック時（アニメ調）
   if image_url == get_character_avatar(detected_name) and not image_url.startswith(
       "data:"
   ):
@@ -234,18 +234,18 @@ def render_ai_message(content):
     c_name = str(detected_name).strip()
     if "アオイ" in c_name:
       fallback_base = (
-          "distinct face, 31-year-old Japanese woman Aoi, sharp cool eyes,"
-          " stylish dark hair, cool expression, realistic portrait"
+          "beautiful anime style illustration, 31-year-old Japanese woman Aoi,"
+          " cool expression, high quality anime art"
       )
     elif "ノア" in c_name:
       fallback_base = (
-          "distinct face, 31-year-old Japanese woman Noa, soft gentle eyes, soft"
-          " hair, sweet smile, realistic portrait"
+          "beautiful anime style illustration, 31-year-old Japanese woman Noa,"
+          " sweet smile, high quality anime art"
       )
     else:
       fallback_base = (
-          "distinct face, 31-year-old Japanese woman Yuuka, neat elegant dark"
-          " hair, gentle smile, realistic portrait"
+          "beautiful anime style illustration, 31-year-old Japanese woman Yuuka,"
+          " gentle smile, high quality anime art"
       )
 
     encoded_prompt = urllib.parse.quote(fallback_base)
