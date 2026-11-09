@@ -155,11 +155,11 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# AIからのメッセージを解析し、思考タグを完全に無視してJSONと個別特徴を抽出する関数
+# AIからのメッセージを解析し、思考タグを除去してキャラクターごとに独立した画像を生成する関数
 def render_ai_message(content):
   cleaned = str(content).strip()
 
-  # DeepSeekの思考タグ (<think>...</think>) があれば完全に削除する
+  # DeepSeekの思考タグ (<think>...</think>) を完全に削除
   cleaned = re.sub(r"<think>.*?</think>", "", cleaned, flags=re.DOTALL).strip()
 
   detected_name = "ユウカ"
@@ -171,7 +171,6 @@ def render_ai_message(content):
   display_text = cleaned
   image_url = get_character_avatar(detected_name)
 
-  # 文字列全体から最初の '{' と最後の '}' を探してJSON部分だけを確実に抜き出す
   start_idx = cleaned.find("{")
   end_idx = cleaned.rfind("}")
   if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
@@ -199,24 +198,25 @@ def render_ai_message(content):
           else:
             import urllib.parse
 
-            # キャラクターごとに個別のベース特徴（完全に分離）
             c_name = str(detected_name).strip()
+            # キャラクターごとに顔立ちや雰囲気を完全に差別化するベースプロンプト
             if "アオイ" in c_name:
               char_base = (
-                  "same face, beautiful 31-year-old Japanese woman with stylish"
-                  " dark hair, cool and slightly tsundere expression, realistic"
-                  " portrait, high quality"
+                  "distinct face, 31-year-old Japanese woman Aoi, sharp cool eyes,"
+                  " stylish dark hair, cool and slightly tsundere expression,"
+                  " realistic portrait, high quality"
               )
             elif "ノア" in c_name:
               char_base = (
-                  "same face, beautiful 31-year-old Japanese woman with soft"
-                  " gentle hair, warm and sweet smiling expression, realistic"
-                  " portrait, high quality"
+                  "distinct face, 31-year-old Japanese woman Noa, soft gentle"
+                  " eyes, soft flowing hair, warm sweet smiling expression,"
+                  " realistic portrait, high quality"
               )
             else:
               char_base = (
-                  "same face, beautiful 31-year-old Japanese woman with neat dark"
-                  " hair, gentle expression, realistic portrait, high quality"
+                  "distinct face, 31-year-old Japanese woman Yuuka, neat elegant"
+                  " dark hair, gentle loving expression, realistic portrait, high"
+                  " quality"
               )
 
             combined_prompt = f"{char_base}, {clean_val}"
@@ -225,7 +225,7 @@ def render_ai_message(content):
     except Exception:
       pass
 
-  # フォールバック時（JSONが取得できなかった場合など）
+  # フォールバック時もキャラクターごとに完全分離
   if image_url == get_character_avatar(detected_name) and not image_url.startswith(
       "data:"
   ):
@@ -234,17 +234,17 @@ def render_ai_message(content):
     c_name = str(detected_name).strip()
     if "アオイ" in c_name:
       fallback_base = (
-          "same face, beautiful 31-year-old Japanese woman Aoi, stylish dark"
-          " hair, cool expression, realistic portrait"
+          "distinct face, 31-year-old Japanese woman Aoi, sharp cool eyes,"
+          " stylish dark hair, cool expression, realistic portrait"
       )
     elif "ノア" in c_name:
       fallback_base = (
-          "same face, beautiful 31-year-old Japanese woman Noa, soft gentle"
+          "distinct face, 31-year-old Japanese woman Noa, soft gentle eyes, soft"
           " hair, sweet smile, realistic portrait"
       )
     else:
       fallback_base = (
-          "same face, beautiful 31-year-old Japanese woman Yuuka, neat dark"
+          "distinct face, 31-year-old Japanese woman Yuuka, neat elegant dark"
           " hair, gentle smile, realistic portrait"
       )
 
