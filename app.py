@@ -155,7 +155,7 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# AIからのメッセージを解析し、シチュエーションに応じた動的画像を生成・構築する関数
+# AIからのメッセージを解析し、キャラクターごとの個性を維持した動的画像を生成する関数
 def render_ai_message(content):
   cleaned = str(content).strip()
 
@@ -166,7 +166,6 @@ def render_ai_message(content):
     detected_name = "ノア"
 
   display_text = cleaned
-  # デフォルトのフォールバック画像（サイドバーのアイコン）
   image_url = get_character_avatar(detected_name)
 
   start_idx = cleaned.find("{")
@@ -182,7 +181,6 @@ def render_ai_message(content):
         if "Name" in parsed:
           detected_name = parsed.get("Name")
 
-        # Dify側から「Image」または「image_prompt」としてシチュエーションの描写を受け取る
         custom_img = (
             parsed.get("Image", "")
             or parsed.get("image", "")
@@ -197,31 +195,58 @@ def render_ai_message(content):
           if clean_val.startswith("http") or clean_val.startswith("data:"):
             image_url = clean_val.split(" ")[0]
           else:
-            # キャラクターの基本ベース（31歳の綺麗な日本女性、黒髪、整った顔立ち）と、
-            # Difyから送られてきたシチュエーションプロンプトを組み合わせて動的生成URLを構築する
             import urllib.parse
 
-            base_identity = (
-                "same face, beautiful 31-year-old Japanese woman with neat dark"
-                " hair, gentle expression, high quality realistic portrait"
-            )
-            combined_prompt = f"{base_identity}, {clean_val}"
+            # キャラクターごとに個別のベース特徴（外見・雰囲気を完全に独立させる）
+            c_name = str(detected_name).strip()
+            if "アオイ" in c_name:
+              char_base = (
+                  "same face, beautiful 31-year-old Japanese woman with stylish"
+                  " dark hair, cool and slightly tsundere expression, realistic"
+                  " portrait, high quality"
+              )
+            elif "ノア" in c_name:
+              char_base = (
+                  "same face, beautiful 31-year-old Japanese woman with soft"
+                  " gentle hair, warm and sweet smiling expression, realistic"
+                  " portrait, high quality"
+              )
+            else:
+              char_base = (
+                  "same face, beautiful 31-year-old Japanese woman with neat dark"
+                  " hair, gentle expression, realistic portrait, high quality"
+              )
+
+            combined_prompt = f"{char_base}, {clean_val}"
             encoded_prompt = urllib.parse.quote(combined_prompt)
             image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=800&height=600&nologo=true"
     except Exception:
       pass
 
-  # もしJSON内に画像指定がなかった場合でも、キャラクターの状態に合わせて動的生成
+  # フォールバック時もキャラクター別のベースを適用
   if image_url == get_character_avatar(detected_name) and not image_url.startswith(
       "data:"
   ):
     import urllib.parse
 
-    fallback_prompt = (
-        f"same face, beautiful 31-year-old Japanese woman {detected_name},"
-        " casual style, warm room, smiling, high quality realistic portrait"
-    )
-    encoded_prompt = urllib.parse.quote(fallback_prompt)
+    c_name = str(detected_name).strip()
+    if "アオイ" in c_name:
+      fallback_base = (
+          "same face, beautiful 31-year-old Japanese woman Aoi, stylish dark"
+          " hair, cool expression, realistic portrait"
+      )
+    elif "ノア" in c_name:
+      fallback_base = (
+          "same face, beautiful 31-year-old Japanese woman Noa, soft gentle"
+          " hair, sweet smile, realistic portrait"
+      )
+    else:
+      fallback_base = (
+          "same face, beautiful 31-year-old Japanese woman Yuuka, neat dark"
+          " hair, gentle smile, realistic portrait"
+      )
+
+    encoded_prompt = urllib.parse.quote(fallback_base)
     image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=800&height=600&nologo=true"
 
   for marker in ["👗", "✨", "📍", "Time:", "Outfit:"]:
