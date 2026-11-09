@@ -155,7 +155,7 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# AIからのメッセージを解析し、アイコンベースを維持した表示を構築する関数
+# AIからのメッセージを解析し、シチュエーションに応じた動的画像を生成・構築する関数
 def render_ai_message(content):
   cleaned = str(content).strip()
 
@@ -166,7 +166,7 @@ def render_ai_message(content):
     detected_name = "ノア"
 
   display_text = cleaned
-  # 基本はサイドバーで設定したお気に入りのアイコン画像をメイン画像としても使用する
+  # デフォルトのフォールバック画像（サイドバーのアイコン）
   image_url = get_character_avatar(detected_name)
 
   start_idx = cleaned.find("{")
@@ -182,24 +182,53 @@ def render_ai_message(content):
         if "Name" in parsed:
           detected_name = parsed.get("Name")
 
-        # もしDify側から特定の画像URLや画像データが指定されていれば優先する
-        custom_img = parsed.get("Image", "") or parsed.get("image", "")
+        # Dify側から「Image」または「image_prompt」としてシチュエーションの描写を受け取る
+        custom_img = (
+            parsed.get("Image", "")
+            or parsed.get("image", "")
+            or parsed.get("image_prompt", "")
+        )
+
         if custom_img:
           clean_val = str(custom_img).strip()
           clean_val = re.sub(r"^\[.*?\]\((.*?)\)$", r"\1", clean_val)
           clean_val = clean_val.strip('"').strip("'").rstrip("}").strip()
+
           if clean_val.startswith("http") or clean_val.startswith("data:"):
             image_url = clean_val.split(" ")[0]
+          else:
+            # キャラクターの基本ベース（31歳の綺麗な日本女性、黒髪、整った顔立ち）と、
+            # Difyから送られてきたシチュエーションプロンプトを組み合わせて動的生成URLを構築する
+            import urllib.parse
+
+            base_identity = (
+                "same face, beautiful 31-year-old Japanese woman with neat dark"
+                " hair, gentle expression, high quality realistic portrait"
+            )
+            combined_prompt = f"{base_identity}, {clean_val}"
+            encoded_prompt = urllib.parse.quote(combined_prompt)
+            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=800&height=600&nologo=true"
     except Exception:
       pass
+
+  # もしJSON内に画像指定がなかった場合でも、キャラクターの状態に合わせて動的生成
+  if image_url == get_character_avatar(detected_name) and not image_url.startswith(
+      "data:"
+  ):
+    import urllib.parse
+
+    fallback_prompt = (
+        f"same face, beautiful 31-year-old Japanese woman {detected_name},"
+        " casual style, warm room, smiling, high quality realistic portrait"
+    )
+    encoded_prompt = urllib.parse.quote(fallback_prompt)
+    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=800&height=600&nologo=true"
 
   for marker in ["👗", "✨", "📍", "Time:", "Outfit:"]:
     if marker in display_text:
       display_text = display_text.split(marker)[0].strip()
 
   current_avatar = get_character_avatar(detected_name)
-  
-  # メイン画像として、サイドバーで調整した愛着のあるアイコン画像を美しく表示する
   img_html = (
       f'<div class="chat-img-container"><img src="{image_url}"'
       ' class="chat-img"></div>'
