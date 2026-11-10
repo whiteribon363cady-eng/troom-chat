@@ -158,22 +158,15 @@ if "messages" not in st.session_state:
 
 # AIからのメッセージを解析し、単体または複数（みんな）の吹き出しを順番に描画する関数
 def render_ai_message(content):
-  cleaned = str(content).strip()
-  # <think> タグや内部の余分な文字列を完全に除去
-  cleaned = re.sub(r"<think>.*?</think>", "", cleaned, flags=re.DOTALL)
-  cleaned = re.sub(
-      r"<!--.*?-->", "", cleaned, flags=re.DOTALL
-  )  # HTMLコメントも削除
-  cleaned = cleaned.strip()
-
+  raw_content = str(content)
   parsed_list = []
 
-  # 1. リスト形式（[ ... ]）のJSONを探す
+  # 1. まず全体（<think>タグの中も含めて）からリスト形式（[ ... ]）のJSONを探す
   try:
-    start_idx = cleaned.find("[")
-    end_idx = cleaned.rfind("]")
+    start_idx = raw_content.find("[")
+    end_idx = raw_content.rfind("]")
     if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-      json_str = cleaned[start_idx : end_idx + 1]
+      json_str = raw_content[start_idx : end_idx + 1]
       parsed_list = json.loads(json_str)
   except Exception:
     pass
@@ -181,6 +174,7 @@ def render_ai_message(content):
   # 2. リストでなければ、単体オブジェクト形式（{ ... }）のJSONを探す
   if not isinstance(parsed_list, list) or not parsed_list:
     try:
+      cleaned = re.sub(r"<think>.*?</think>", "", raw_content, flags=re.DOTALL)
       start_idx = cleaned.find("{")
       end_idx = cleaned.rfind("}")
       if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
@@ -191,8 +185,9 @@ def render_ai_message(content):
     except Exception:
       pass
 
-  # 3. どちらのJSONとしてもパースできなかった場合のフォールバック
+  # 3. それでもパースできなかった場合のフォールバック
   if not parsed_list:
+    cleaned = re.sub(r"<think>.*?</think>", "", raw_content, flags=re.DOTALL).strip()
     detected_name = "ユウカ"
     if "アオイ" in cleaned:
       detected_name = "アオイ"
