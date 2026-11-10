@@ -156,7 +156,7 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# AIからのメッセージを解析し、3人全員のアイコンと完全に一致する画像を生成する関数
+# AIからのメッセージを解析し、より明るく鮮やかなアニメ調画像を生成する関数
 def render_ai_message(content):
   cleaned = str(content).strip()
   cleaned = re.sub(r"<think>.*?</think>", "", cleaned, flags=re.DOTALL).strip()
@@ -201,33 +201,33 @@ def render_ai_message(content):
 
             c_name = str(detected_name).strip()
 
-            # ★3人全員のアイコン特徴（髪型・髪色・スーツや服装）に完全一致させるプロンプト
+            # ★全体的に明るく爽やかで、アイコンのタッチに完全に近づけた高品質プロンプト
             if "アオイ" in c_name:
               char_base = (
-                  "masterpiece, best quality, beautiful high-end anime"
-                  " illustration, 31-year-old Japanese woman Aoi, short dark"
-                  " bob hair, smart purple eyes, wearing a stylish dark blue"
-                  " business pants suit with white shirt, intelligent and cool"
-                  " expression, highly detailed facial features, beautiful"
-                  " lighting"
+                  "masterpiece, best quality, bright and vibrant high-end anime"
+                  " illustration, clean soft lighting, 31-year-old Japanese"
+                  " woman Aoi, short dark bob hair, smart purple eyes, wearing"
+                  " a stylish dark blue business pants suit with white shirt,"
+                  " intelligent and cool expression, highly detailed facial"
+                  " features"
               )
             elif "ノア" in c_name:
               char_base = (
-                  "masterpiece, best quality, beautiful high-end anime"
-                  " illustration, 31-year-old Japanese woman Noa, dark purple"
-                  " long hair tied in a half-up style, sharp intelligent eyes,"
-                  " wearing a dark grey business suit jacket and skirt with"
-                  " white shirt, cool and professional expression, highly"
-                  " detailed facial features, beautiful lighting"
+                  "masterpiece, best quality, bright and vibrant high-end anime"
+                  " illustration, clean soft lighting, 31-year-old Japanese"
+                  " woman Noa, dark purple long hair tied in a half-up style,"
+                  " sharp intelligent eyes, wearing a dark grey business suit"
+                  " jacket and skirt with white shirt, cool and professional"
+                  " expression, highly detailed facial features"
               )
             else:
               char_base = (
-                  "masterpiece, best quality, beautiful high-end anime"
-                  " illustration, 31-year-old Japanese woman Yuuka, long"
-                  " brown wavy hair with braided side hair ornament, warm amber"
-                  " eyes, wearing wine-red off-shoulder sweater, gentle loving"
-                  " smiling expression, highly detailed facial features,"
-                  " beautiful lighting"
+                  "masterpiece, best quality, bright and vibrant high-end anime"
+                  " illustration, clean soft lighting, 31-year-old Japanese"
+                  " woman Yuuka, long brown wavy hair with braided side hair"
+                  " ornament, warm amber eyes, wearing wine-red off-shoulder"
+                  " sweater, gentle loving smiling expression, highly detailed"
+                  " facial features"
               )
 
             combined_prompt = f"{char_base}, {clean_val}"
