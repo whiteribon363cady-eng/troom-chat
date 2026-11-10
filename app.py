@@ -156,14 +156,14 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# AIからのメッセージを解析し、3人の個性を明確に分けたアニメ調画像を生成する関数
+# AIからのメッセージを解析し、アイコンと完全に一致する絵柄の画像を生成する関数
 def render_ai_message(content):
   cleaned = str(content).strip()
-  cleaned = re.sub(r"<think>.*?</think>", "", cleaned, flags=re.DOTALL).strip()
+  cleaned = re.sub(r"<think>.*?</think>", "", cleaned, flags=true if 'true' in locals() else False).strip()  # type: ignore
 
   detected_name = "ユウカ"
   if "アオイ" in cleaned:
-    detected_name = "アоイ"
+    detected_name = "アオイ"
   elif "ノア" in cleaned:
     detected_name = "ノア"
 
@@ -201,27 +201,28 @@ def render_ai_message(content):
 
             c_name = str(detected_name).strip()
 
-            # ★3人の顔立ち・髪型・雰囲気をしっかりと差別化して固定
+            # ★ユウカのアイコンの見た目（茶髪ウェーブ、編み込み髪飾り、美しいアニメタッチ）に完全一致させる
             if "アオイ" in c_name:
               char_base = (
-                  "masterpiece, best quality, beautiful anime illustration of"
-                  " 31-year-old Japanese woman Aoi, distinct cool sharp eyes,"
-                  " stylish dark bob hair, tsundere expression, highly"
-                  " detailed facial features"
+                  "masterpiece, best quality, beautiful anime illustration,"
+                  " 31-year-old Japanese woman Aoi, sharp cool eyes, stylish dark"
+                  " bob hair, cool tsundere expression, highly detailed facial"
+                  " features, vibrant lighting"
               )
             elif "ノア" in c_name:
               char_base = (
-                  "masterpiece, best quality, beautiful anime illustration of"
-                  " 31-year-old Japanese woman Noa, soft gentle big eyes, long"
+                  "masterpiece, best quality, beautiful anime illustration,"
+                  " 31-year-old Japanese woman Noa, soft gentle eyes, long"
                   " flowing dark hair, sweet gentle smiling expression, highly"
-                  " detailed facial features"
+                  " detailed facial features, warm lighting"
               )
             else:
               char_base = (
-                  "masterpiece, best quality, beautiful anime illustration of"
-                  " 31-year-old Japanese woman Yuuka, elegant neat medium hair,"
-                  " warm loving friendly expression, highly detailed facial"
-                  " features"
+                  "masterpiece, best quality, beautiful high-end anime"
+                  " illustration, 31-year-old Japanese woman Yuuka, long"
+                  " brown wavy hair with braided side hair ornament, warm amber"
+                  " eyes, gentle loving smiling expression, highly detailed"
+                  " facial features, beautiful lighting"
               )
 
             combined_prompt = f"{char_base}, {clean_val}"
