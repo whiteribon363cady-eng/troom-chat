@@ -42,7 +42,7 @@ st.sidebar.markdown("### 🖼️ キャラクターアイコン設定")
 default_ai_icon = "https://api.iconify.design/noto:girl.svg"
 user_default_icon = "https://api.iconify.design/noto:boy.svg"
 
-# セッションステートの初期化（一度設定したら保持されるようにする）
+# セッションステートの初期化（永続保持）
 if "yuuka_avatar" not in st.session_state:
   st.session_state.yuuka_avatar = default_ai_icon
 if "aoi_avatar" not in st.session_state:
@@ -118,7 +118,6 @@ def process_avatar_fixed(uploaded_file, default_url, key_prefix):
   return default_url
 
 
-# 新しくファイルがアップロードされた時だけセッションを更新する
 if yuuka_icon_file is not None:
   st.session_state.yuuka_avatar = process_avatar_fixed(
       yuuka_icon_file, default_ai_icon, "yuuka"
@@ -157,11 +156,9 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# AIからのメッセージを解析し、アニメ・イラスト調の画像を動적生成する関数
+# AIからのメッセージを解析し、アイコンの雰囲気を反映したアニメ調画像を生成する関数
 def render_ai_message(content):
   cleaned = str(content).strip()
-
-  # DeepSeekの思考タグ (<think>...</think>) を完全に削除
   cleaned = re.sub(r"<think>.*?</think>", "", cleaned, flags=re.DOTALL).strip()
 
   detected_name = "ユウカ"
@@ -171,7 +168,8 @@ def render_ai_message(content):
     detected_name = "ノア"
 
   display_text = cleaned
-  image_url = get_character_avatar(detected_name)
+  current_avatar = get_character_avatar(detected_name)
+  image_url = current_avatar  # デフォルトはアイコン画像そのもの
 
   start_idx = cleaned.find("{")
   end_idx = cleaned.rfind("}")
@@ -183,6 +181,7 @@ def render_ai_message(content):
         display_text = parsed.get("message", parsed.get("text", display_text))
         if "Name" in parsed:
           detected_name = parsed.get("Name")
+          current_avatar = get_character_avatar(detected_name)
 
         custom_img = (
             parsed.get("Image", "")
@@ -201,24 +200,25 @@ def render_ai_message(content):
             import urllib.parse
 
             c_name = str(detected_name).strip()
-            # キャラクターごとに顔立ちや雰囲気をアニメ・イラスト調に固定
+
+            # キャラクターごとにアイコンの見た目に沿ったベース特徴を設定
             if "アオイ" in c_name:
               char_base = (
-                  "beautiful anime style illustration, 31-year-old Japanese woman"
-                  " Aoi, sharp cool eyes, stylish dark hair, cool tsundere"
-                  " expression, high quality anime art"
+                  "beautiful anime illustration, matching the user uploaded"
+                  " character reference image, sharp cool eyes, stylish dark"
+                  " hair, cool expression, high quality anime art"
               )
             elif "ノア" in c_name:
               char_base = (
-                  "beautiful anime style illustration, 31-year-old Japanese woman"
-                  " Noa, soft gentle eyes, soft flowing hair, warm sweet smiling"
-                  " expression, high quality anime art"
+                  "beautiful anime illustration, matching the user uploaded"
+                  " character reference image, soft gentle eyes, flowing hair,"
+                  " sweet smiling expression, high quality anime art"
               )
             else:
               char_base = (
-                  "beautiful anime style illustration, 31-year-old Japanese woman"
-                  " Yuuka, neat elegant dark hair, gentle loving expression, high"
-                  " quality anime art"
+                  "beautiful anime illustration, matching the user uploaded"
+                  " character reference image, neat elegant hair, gentle loving"
+                  " expression, high quality anime art"
               )
 
             combined_prompt = f"{char_base}, {clean_val}"
@@ -227,37 +227,10 @@ def render_ai_message(content):
     except Exception:
       pass
 
-  # フォールバック時（アニメ調）
-  if image_url == get_character_avatar(detected_name) and not image_url.startswith(
-      "data:"
-  ):
-    import urllib.parse
-
-    c_name = str(detected_name).strip()
-    if "アオイ" in c_name:
-      fallback_base = (
-          "beautiful anime style illustration, 31-year-old Japanese woman Aoi,"
-          " cool expression, high quality anime art"
-      )
-    elif "ノア" in c_name:
-      fallback_base = (
-          "beautiful anime style illustration, 31-year-old Japanese woman Noa,"
-          " sweet smile, high quality anime art"
-      )
-    else:
-      fallback_base = (
-          "beautiful anime style illustration, 31-year-old Japanese woman Yuuka,"
-          " gentle smile, high quality anime art"
-      )
-
-    encoded_prompt = urllib.parse.quote(fallback_base)
-    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=800&height=600&nologo=true"
-
   for marker in ["👗", "✨", "📍", "Time:", "Outfit:"]:
     if marker in display_text:
       display_text = display_text.split(marker)[0].strip()
 
-  current_avatar = get_character_avatar(detected_name)
   img_html = (
       f'<div class="chat-img-container"><img src="{image_url}"'
       ' class="chat-img"></div>'
