@@ -42,6 +42,16 @@ st.sidebar.markdown("### 🖼️ キャラクターアイコン設定")
 default_ai_icon = "https://api.iconify.design/noto:girl.svg"
 user_default_icon = "https://api.iconify.design/noto:boy.svg"
 
+# セッションステートの初期化（一度設定したら保持されるようにする）
+if "yuuka_avatar" not in st.session_state:
+  st.session_state.yuuka_avatar = default_ai_icon
+if "aoi_avatar" not in st.session_state:
+  st.session_state.aoi_avatar = default_ai_icon
+if "noa_avatar" not in st.session_state:
+  st.session_state.noa_avatar = default_ai_icon
+if "user_avatar" not in st.session_state:
+  st.session_state.user_avatar = user_default_icon
+
 yuuka_icon_file = st.sidebar.file_uploader(
     "ユウカのアイコン", type=["png", "jpg", "jpeg"], key="yuuka_up"
 )
@@ -108,15 +118,7 @@ def process_avatar_fixed(uploaded_file, default_url, key_prefix):
   return default_url
 
 
-if "yuuka_avatar" not in st.session_state:
-  st.session_state.yuuka_avatar = default_ai_icon
-if "aoi_avatar" not in st.session_state:
-  st.session_state.aoi_avatar = default_ai_icon
-if "noa_avatar" not in st.session_state:
-  st.session_state.noa_avatar = default_ai_icon
-if "user_avatar" not in st.session_state:
-  st.session_state.user_avatar = user_default_icon
-
+# 新しくファイルがアップロードされた時だけセッションを更新する
 if yuuka_icon_file is not None:
   st.session_state.yuuka_avatar = process_avatar_fixed(
       yuuka_icon_file, default_ai_icon, "yuuka"
@@ -155,7 +157,7 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# AIからのメッセージを解析し、アニメ・イラスト調の画像を動的生成する関数
+# AIからのメッセージを解析し、アニメ・イラスト調の画像を動적生成する関数
 def render_ai_message(content):
   cleaned = str(content).strip()
 
@@ -199,7 +201,7 @@ def render_ai_message(content):
             import urllib.parse
 
             c_name = str(detected_name).strip()
-            # アニメ・イラスト調に統一されたキャラクターごとのベースプロンプト
+            # キャラクターごとに顔立ちや雰囲気をアニメ・イラスト調に固定
             if "アオイ" in c_name:
               char_base = (
                   "beautiful anime style illustration, 31-year-old Japanese woman"
