@@ -156,97 +156,119 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# AIからのメッセージを解析し、より明るく鮮やかなアニメ調画像を生成する関数
+# AIからのメッセージを解析し、単体または複数（みんな）の吹き出しを順番に描画する関数
 def render_ai_message(content):
   cleaned = str(content).strip()
   cleaned = re.sub(r"<think>.*?</think>", "", cleaned, flags=re.DOTALL).strip()
 
-  detected_name = "ユウカ"
-  if "アオイ" in cleaned:
-    detected_name = "アオイ"
-  elif "ノア" in cleaned:
-    detected_name = "ノア"
+  parsed_list = []
 
-  display_text = cleaned
-  current_avatar = get_character_avatar(detected_name)
-  image_url = current_avatar
-
-  start_idx = cleaned.find("{")
-  end_idx = cleaned.rfind("}")
+  # 1. まずリスト形式（[ { ... }, { ... } ]）のJSONを探す
+  start_idx = cleaned.find("[")
+  end_idx = cleaned.rfind("]")
   if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
     try:
-      json_candidate = cleaned[start_idx : end_idx + 1]
-      parsed = json.loads(json_candidate)
-      if isinstance(parsed, dict):
-        display_text = parsed.get("message", parsed.get("text", display_text))
-        if "Name" in parsed:
-          detected_name = parsed.get("Name")
-          current_avatar = get_character_avatar(detected_name)
-
-        custom_img = (
-            parsed.get("Image", "")
-            or parsed.get("image", "")
-            or parsed.get("image_prompt", "")
-        )
-
-        if custom_img:
-          clean_val = str(custom_img).strip()
-          clean_val = re.sub(r"^\[.*?\]\((.*?)\)$", r"\1", clean_val)
-          clean_val = clean_val.strip('"').strip("'").rstrip("}").strip()
-
-          if clean_val.startswith("http") or clean_val.startswith("data:"):
-            image_url = clean_val.split(" ")[0]
-          else:
-            import urllib.parse
-
-            c_name = str(detected_name).strip()
-
-            # ★全体的に明るく爽やかで、アイコンのタッチに完全に近づけた高品質プロンプト
-            if "アオイ" in c_name:
-              char_base = (
-                  "masterpiece, best quality, bright and vibrant high-end anime"
-                  " illustration, clean soft lighting, 31-year-old Japanese"
-                  " woman Aoi, short dark bob hair, smart purple eyes, wearing"
-                  " a stylish dark blue business pants suit with white shirt,"
-                  " intelligent and cool expression, highly detailed facial"
-                  " features"
-              )
-            elif "ノア" in c_name:
-              char_base = (
-                  "masterpiece, best quality, bright and vibrant high-end anime"
-                  " illustration, clean soft lighting, 31-year-old Japanese"
-                  " woman Noa, dark purple long hair tied in a half-up style,"
-                  " sharp intelligent eyes, wearing a dark grey business suit"
-                  " jacket and skirt with white shirt, cool and professional"
-                  " expression, highly detailed facial features"
-              )
-            else:
-              char_base = (
-                  "masterpiece, best quality, bright and vibrant high-end anime"
-                  " illustration, clean soft lighting, 31-year-old Japanese"
-                  " woman Yuuka, long brown wavy hair with braided side hair"
-                  " ornament, warm amber eyes, wearing wine-red off-shoulder"
-                  " sweater, gentle loving smiling expression, highly detailed"
-                  " facial features"
-              )
-
-            combined_prompt = f"{char_base}, {clean_val}"
-            encoded_prompt = urllib.parse.quote(combined_prompt)
-            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=800&height=600&nologo=true"
+      parsed_list = json.loads(cleaned[start_idx : end_idx + 1])
     except Exception:
       pass
 
-  for marker in ["👗", "✨", "📍", "Time:", "Outfit:"]:
-    if marker in display_text:
-      display_text = display_text.split(marker)[0].strip()
+  # 2. リストでなければ、単体オブジェクト形式（{ ... }）のJSONを探す
+  if not isinstance(parsed_list, list) or not parsed_list:
+    start_idx = cleaned.find("{")
+    end_idx = cleaned.rfind("}")
+    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+      try:
+        single_parsed = json.loads(cleaned[start_idx : end_idx + 1])
+        if isinstance(single_parsed, dict):
+          parsed_list = [single_parsed]
+      except Exception:
+        pass
 
-  img_html = (
-      f'<div class="chat-img-container"><img src="{image_url}"'
-      ' class="chat-img"></div>'
-  )
+  # 3. どちらのJSONとしてもパースできなかった場合のフォールバック
+  if not parsed_list:
+    detected_name = "ユウカ"
+    if "アオイ" in cleaned:
+      detected_name = "アオイ"
+    elif "ノア" in cleaned:
+      detected_name = "ノア"
+    parsed_list = [{"Name": detected_name, "message": cleaned, "Image": ""}]
 
-  st.markdown(
-      f"""
+  # リストに含まれるキャラクターごとに順番に吹き出しを描画
+  for idx, item in enumerate(parsed_list):
+    if not isinstance(item, dict):
+      continue
+
+    detected_name = item.get("Name", "ユウカ")
+    display_text = item.get(
+        "message", item.get("text", str(item))
+    )
+    current_avatar = get_character_avatar(detected_name)
+    image_url = current_avatar
+
+    custom_img = (
+        item.get("Image", "")
+        or item.get("image", "")
+        or item.get("image_prompt", "")
+    )
+
+    if custom_img:
+      clean_val = str(custom_img).strip()
+      clean_val = re.sub(r"^\[.*?\]\((.*?)\)$", r"\1", clean_val)
+      clean_val = clean_val.strip('"').strip("'").rstrip("}").strip()
+
+      if clean_val.startswith("http") or clean_val.startswith("data:"):
+        image_url = clean_val.split(" ")[0]
+      else:
+        import urllib.parse
+
+        c_name = str(detected_name).strip()
+
+        if "アオイ" in c_name:
+          char_base = (
+              "masterpiece, best quality, bright and vibrant high-end anime"
+              " illustration, clean soft lighting, 31-year-old Japanese"
+              " woman Aoi, short dark bob hair, smart purple eyes, wearing"
+              " a stylish dark blue business pants suit with white shirt,"
+              " intelligent and cool expression, highly detailed facial"
+              " features"
+          )
+        elif "ノア" in c_name:
+          char_base = (
+              "masterpiece, best quality, bright and vibrant high-end anime"
+              " illustration, clean soft lighting, 31-year-old Japanese"
+              " woman Noa, dark purple long hair tied in a half-up style,"
+              " sharp intelligent eyes, wearing a dark grey business suit"
+              " jacket and skirt with white shirt, cool and professional"
+              " expression, highly detailed facial features"
+          )
+        else:
+          char_base = (
+              "masterpiece, best quality, bright and vibrant high-end anime"
+              " illustration, clean soft lighting, 31-year-old Japanese"
+              " woman Yuuka, long brown wavy hair with braided side hair"
+              " ornament, warm amber eyes, wearing wine-red off-shoulder"
+              " sweater, gentle loving smiling expression, highly detailed"
+              " facial features"
+          )
+
+        combined_prompt = f"{char_base}, {clean_val}"
+        encoded_prompt = urllib.parse.quote(combined_prompt)
+        image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=800&height=600&nologo=true"
+
+    for marker in ["👗", "✨", "📍", "Time:", "Outfit:"]:
+      if marker in display_text:
+        display_text = display_text.split(marker)[0].strip()
+
+    # 先頭の要素のみ画像を表示（全員参加のとき重なりを防ぐため）
+    img_html = (
+        f'<div class="chat-img-container"><img src="{image_url}"'
+        ' class="chat-img"></div>'
+        if idx == 0 and custom_img
+        else ""
+    )
+
+    st.markdown(
+        f"""
         <div class="chat-row ai">
             <img src="{current_avatar}" class="avatar">
             <div class="bubble-container">
@@ -255,8 +277,8 @@ def render_ai_message(content):
             </div>
         </div>
         """,
-      unsafe_allow_html=True,
-  )
+        unsafe_allow_html=True,
+    )
 
 
 # 過去のメッセージの描画
