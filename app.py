@@ -159,30 +159,37 @@ if "messages" not in st.session_state:
 # AIからのメッセージを解析し、単体または複数（みんな）の吹き出しを順番に描画する関数
 def render_ai_message(content):
   cleaned = str(content).strip()
-  cleaned = re.sub(r"<think>.*?</think>", "", cleaned, flags=re.DOTALL).strip()
+  # <think> タグや内部の余分な文字列を完全に除去
+  cleaned = re.sub(r"<think>.*?</think>", "", cleaned, flags=re.DOTALL)
+  cleaned = re.sub(
+      r"<!--.*?-->", "", cleaned, flags=re.DOTALL
+  )  # HTMLコメントも削除
+  cleaned = cleaned.strip()
 
   parsed_list = []
 
-  # 1. まずリスト形式（[ { ... }, { ... } ]）のJSONを探す
-  start_idx = cleaned.find("[")
-  end_idx = cleaned.rfind("]")
-  if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-    try:
-      parsed_list = json.loads(cleaned[start_idx : end_idx + 1])
-    except Exception:
-      pass
+  # 1. リスト形式（[ ... ]）のJSONを探す
+  try:
+    start_idx = cleaned.find("[")
+    end_idx = cleaned.rfind("]")
+    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+      json_str = cleaned[start_idx : end_idx + 1]
+      parsed_list = json.loads(json_str)
+  except Exception:
+    pass
 
   # 2. リストでなければ、単体オブジェクト形式（{ ... }）のJSONを探す
   if not isinstance(parsed_list, list) or not parsed_list:
-    start_idx = cleaned.find("{")
-    end_idx = cleaned.rfind("}")
-    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-      try:
-        single_parsed = json.loads(cleaned[start_idx : end_idx + 1])
+    try:
+      start_idx = cleaned.find("{")
+      end_idx = cleaned.rfind("}")
+      if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+        json_str = cleaned[start_idx : end_idx + 1]
+        single_parsed = json.loads(json_str)
         if isinstance(single_parsed, dict):
           parsed_list = [single_parsed]
-      except Exception:
-        pass
+    except Exception:
+      pass
 
   # 3. どちらのJSONとしてもパースできなかった場合のフォールバック
   if not parsed_list:
@@ -198,10 +205,14 @@ def render_ai_message(content):
     if not isinstance(item, dict):
       continue
 
-    detected_name = item.get("Name", "ユウカ")
-    display_text = item.get(
-        "message", item.get("text", str(item))
-    )
+    detected_name = str(item.get("Name", item.get("name", "ユウカ"))).strip()
+    display_text = str(
+        item.get("message", item.get("text", item.get("content", "")))
+    ).strip()
+
+    if not display_text:
+      display_text = str(item)
+
     current_avatar = get_character_avatar(detected_name)
     image_url = current_avatar
 
@@ -259,7 +270,7 @@ def render_ai_message(content):
       if marker in display_text:
         display_text = display_text.split(marker)[0].strip()
 
-    # 先頭の要素のみ画像を表示（全員参加のとき重なりを防ぐため）
+    # 先頭の要素のみ画像を表示
     img_html = (
         f'<div class="chat-img-container"><img src="{image_url}"'
         ' class="chat-img"></div>'
