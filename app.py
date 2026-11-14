@@ -233,32 +233,30 @@ def render_ai_message(content):
 
         c_name = str(detected_name).strip()
 
+        # ★ リアル感を抑え、パキッとした2Dアニメ（セルシェーディング調）にするためのベースプロンプト
+        anime_2d_base = (
+            "masterpiece, best quality, 2d animation, flat color, cel shading, "
+            "clean lines, high quality anime drawing, vivid colors, "
+            "completely removing photorealistic, no realism"
+        )
+
         if "アオイ" in c_name:
           char_base = (
-              "masterpiece, best quality, bright and vibrant high-end anime"
-              " illustration, clean soft lighting, 31-year-old Japanese"
-              " woman Aoi, short dark bob hair, smart purple eyes, wearing"
-              " a stylish dark blue business pants suit with white shirt,"
-              " intelligent and cool expression, highly detailed facial"
-              " features"
+              f"{anime_2d_base}, 31-year-old smart Japanese woman Aoi, "
+              "short dark bob hair, smart purple eyes, wearing a stylish dark blue "
+              "business pants suit with white shirt, intelligent and cool expression"
           )
         elif "ノア" in c_name:
           char_base = (
-              "masterpiece, best quality, bright and vibrant high-end anime"
-              " illustration, clean soft lighting, 31-year-old Japanese"
-              " woman Noa, dark purple long hair tied in a half-up style,"
-              " sharp intelligent eyes, wearing a dark grey business suit"
-              " jacket and skirt with white shirt, cool and professional"
-              " expression, highly detailed facial features"
+              f"{anime_2d_base}, 31-year-old cool professional Japanese woman Noa, "
+              "dark purple long hair tied in a half-up style, sharp intelligent eyes, "
+              "wearing a dark grey business suit jacket and skirt with white shirt"
           )
         else:
           char_base = (
-              "masterpiece, best quality, bright and vibrant high-end anime"
-              " illustration, clean soft lighting, 31-year-old Japanese"
-              " woman Yuuka, long brown wavy hair with braided side hair"
-              " ornament, warm amber eyes, wearing wine-red off-shoulder"
-              " sweater, gentle loving smiling expression, highly detailed"
-              " facial features"
+              f"{anime_2d_base}, 31-year-old Japanese woman Yuuka, "
+              "long brown wavy hair with braided side hair ornament, warm amber eyes, "
+              "wearing wine-red off-shoulder sweater, gentle smiling expression"
           )
 
         combined_prompt = f"{char_base}, {clean_val}"
