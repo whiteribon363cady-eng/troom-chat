@@ -233,11 +233,12 @@ def render_ai_message(content):
 
         c_name = str(detected_name).strip()
 
-        # ★ リアル感を抑え、パキッとした2Dアニメ（セルシェーディング調）にするためのベースプロンプト
+        # ★ フィギュアっぽさを完全になくし、温かみのある手描きアニメ風（IMG_3789.JPGの質感）にするベースプロンプト
         anime_2d_base = (
-            "masterpiece, best quality, 2d animation, flat color, cel shading, "
-            "clean lines, high quality anime drawing, vivid colors, "
-            "completely removing photorealistic, no realism"
+            "masterpiece, best quality, beautiful 2d anime illustration, "
+            "soft cinematic lighting, warm cozy atmosphere, "
+            "hand-drawn anime style, smooth pastel colors, "
+            "no 3d render, no CGI, no photorealistic, zero plastic texture"
         )
 
         if "アオイ" in c_name:
