@@ -259,6 +259,7 @@ def render_ai_message(content):
               "wearing wine-red off-shoulder sweater, gentle smiling expression"
           )
 
+        # キャラクター基本設定 ＋ その時々のシチュエーション指示（clean_val）を結合
         combined_prompt = f"{char_base}, {clean_val}"
         encoded_prompt = urllib.parse.quote(combined_prompt)
         image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=800&height=600&nologo=true"
