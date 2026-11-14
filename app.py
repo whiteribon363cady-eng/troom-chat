@@ -8,7 +8,9 @@ import streamlit as st
 from PIL import Image
 
 # ページの設定
-st.set_page_config(page_title="Ｔroom - LINE風チャット", page_icon="💬", layout="centered")
+st.set_page_config(
+    page_title="Ｔroom - LINE風チャット", page_icon="💬", layout="centered"
+)
 
 # スタイリング（LINE風チャット＆丸型アイコン・画像デザイン用）
 st.markdown(
@@ -51,19 +53,6 @@ if "noa_avatar" not in st.session_state:
   st.session_state.noa_avatar = default_ai_icon
 if "user_avatar" not in st.session_state:
   st.session_state.user_avatar = user_default_icon
-
-yuuka_icon_file = st.sidebar.file_uploader(
-    "ユウカのアイコン", type=["png", "jpg", "jpeg"], key="yuuka_up"
-)
-aoi_icon_file = st.sidebar.file_uploader(
-    "アオイのアイコン", type=["png", "jpg", "jpeg"], key="aoi_up"
-)
-noa_icon_file = st.sidebar.file_uploader(
-    "ノアのアイコン", type=["png", "jpg", "jpeg"], key="noa_up"
-)
-user_icon_file = st.sidebar.file_uploader(
-    "自分のアイコン", type=["png", "jpg", "jpeg"], key="user_up"
-)
 
 
 # 画像のアスペクト比を維持して綺麗に正方形クロップする関数
@@ -118,21 +107,36 @@ def process_avatar_fixed(uploaded_file, default_url, key_prefix):
   return default_url
 
 
+# 各ファイルアップローダーの配置
+yuuka_icon_file = st.sidebar.file_uploader(
+    "ユウカのアイコン", type=["png", "jpg", "jpeg"], key="yuuka_up"
+)
+aoi_icon_file = st.sidebar.file_uploader(
+    "アオイのアイコン", type=["png", "jpg", "jpeg"], key="aoi_up"
+)
+noa_icon_file = st.sidebar.file_uploader(
+    "ノアのアイコン", type=["png", "jpg", "jpeg"], key="noa_up"
+)
+user_icon_file = st.sidebar.file_uploader(
+    "自分のアイコン", type=["png", "jpg", "jpeg"], key="user_up"
+)
+
+# 新しくファイルがアップロードされた場合のみセッションを更新する（保持する仕様）
 if yuuka_icon_file is not None:
   st.session_state.yuuka_avatar = process_avatar_fixed(
-      yuuka_icon_file, default_ai_icon, "yuuka"
+      yuuka_icon_file, st.session_state.yuuka_avatar, "yuuka"
   )
 if aoi_icon_file is not None:
   st.session_state.aoi_avatar = process_avatar_fixed(
-      aoi_icon_file, default_ai_icon, "aoi"
+      aoi_icon_file, st.session_state.aoi_avatar, "aoi"
   )
 if noa_icon_file is not None:
   st.session_state.noa_avatar = process_avatar_fixed(
-      noa_icon_file, default_ai_icon, "noa"
+      noa_icon_file, st.session_state.noa_avatar, "noa"
   )
 if user_icon_file is not None:
   st.session_state.user_avatar = process_avatar_fixed(
-      user_icon_file, user_default_icon, "user"
+      user_icon_file, st.session_state.user_avatar, "user"
   )
 
 
