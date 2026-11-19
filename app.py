@@ -2,7 +2,9 @@ import base64
 import io
 import json
 import os
+import random
 import re
+import urllib.parse
 import requests
 import streamlit as st
 from PIL import Image
@@ -229,11 +231,9 @@ def render_ai_message(content):
       if clean_val.startswith("http") or clean_val.startswith("data:"):
         image_url = clean_val.split(" ")[0]
       else:
-        import urllib.parse
-
         c_name = str(detected_name).strip()
 
-        # ★ フィギュアっぽさを完全になくし、温かみのある手描きアニメ風（IMG_3789.JPGの質感）にするベースプロンプト
+        # ★ フィギュアっぽさを完全になくし、温かみのある手描きアニメ風にするベースプロンプト
         anime_2d_base = (
             "masterpiece, best quality, beautiful 2d anime illustration, "
             "soft cinematic lighting, warm cozy atmosphere, "
@@ -241,29 +241,31 @@ def render_ai_message(content):
             "no 3d render, no CGI, no photorealistic, zero plastic texture"
         )
 
+        # ★ 固定の服装や表情は入れず、変わらないキャラクター特徴のみを指定（服装・場所・ポーズは毎回 clean_val で変化）
         if "アオイ" in c_name:
           char_base = (
-              f"{anime_2d_base}, 31-year-old smart Japanese woman Aoi, "
-              "short dark bob hair, smart purple eyes, wearing a stylish dark blue "
-              "business pants suit with white shirt, intelligent and cool expression"
+              f"{anime_2d_base}, 30-year-old Japanese woman Aoi, "
+              "short dark bob hair, smart purple eyes"
           )
         elif "ノア" in c_name:
           char_base = (
-              f"{anime_2d_base}, 31-year-old cool professional Japanese woman Noa, "
-              "dark purple long hair tied in a half-up style, sharp intelligent eyes, "
-              "wearing a dark grey business suit jacket and skirt with white shirt"
+              f"{anime_2d_base}, 32-year-old Japanese half woman Noa, "
+              "dark purple long hair tied in a half-up style, sharp intelligent eyes"
           )
         else:
           char_base = (
-              f"{anime_2d_base}, 31-year-old Japanese woman Yuuka, "
-              "long brown wavy hair with braided side hair ornament, warm amber eyes, "
-              "wearing wine-red off-shoulder sweater, gentle smiling expression"
+              f"{anime_2d_base}, 29-year-old Japanese woman Yuuka, "
+              "long brown wavy hair with braided side hair ornament, warm amber eyes"
           )
 
         # キャラクター基本設定 ＋ その時々のシチュエーション指示（clean_val）を結合
         combined_prompt = f"{char_base}, {clean_val}"
         encoded_prompt = urllib.parse.quote(combined_prompt)
-        image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=800&height=600&nologo=true"
+        seed_val = random.randint(1, 999999999)
+        image_url = (
+            f"https://image.pollinations.ai/prompt/{encoded_prompt}"
+            f"?width=800&height=600&nologo=true&seed={seed_val}"
+        )
 
     for marker in ["👗", "✨", "📍", "Time:", "Outfit:"]:
       if marker in display_text:
