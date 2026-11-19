@@ -233,15 +233,14 @@ def render_ai_message(content):
       else:
         c_name = str(detected_name).strip()
 
-        # ★ フィギュアっぽさを完全になくし、温かみのある手描きアニメ風にするベースプロンプト
+        # ★ 添付画像（IMG_3789.JPG）のような線画・アニメ塗り・暖色ライティングに寄せるベースプロンプト
         anime_2d_base = (
-            "masterpiece, best quality, beautiful 2d anime illustration, "
-            "soft cinematic lighting, warm cozy atmosphere, "
-            "hand-drawn anime style, smooth pastel colors, "
-            "no 3d render, no CGI, no photorealistic, zero plastic texture"
+            "masterpiece, best quality, 2d anime illustration, "
+            "clean dark lineart, anime coloring, detailed anime eyes, "
+            "soft blush, warm cozy lighting, soft rim light, "
+            "no 3d render, no CGI, no photorealistic, no realistic skin"
         )
 
-        # ★ 固定の服装や表情は入れず、変わらないキャラクター特徴のみを指定（服装・場所・ポーズは毎回 clean_val で変化）
         if "アオイ" in c_name:
           char_base = (
               f"{anime_2d_base}, 30-year-old Japanese woman Aoi, "
@@ -258,7 +257,6 @@ def render_ai_message(content):
               "long brown wavy hair with braided side hair ornament, warm amber eyes"
           )
 
-        # キャラクター基本設定 ＋ その時々のシチュエーション指示（clean_val）を結合
         combined_prompt = f"{char_base}, {clean_val}"
         encoded_prompt = urllib.parse.quote(combined_prompt)
         seed_val = random.randint(1, 999999999)
@@ -271,7 +269,6 @@ def render_ai_message(content):
       if marker in display_text:
         display_text = display_text.split(marker)[0].strip()
 
-    # 先頭の要素のみ画像を表示
     img_html = (
         f'<div class="chat-img-container"><img src="{image_url}"'
         ' class="chat-img"></div>'
