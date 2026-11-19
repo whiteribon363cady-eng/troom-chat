@@ -162,12 +162,10 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# AIからのメッセージを解析し、単体または複数（みんな）の吹き出しを順番に描画する関数
-def render_ai_message(content):
+def parse_ai_items(content):
   raw_content = str(content)
   parsed_list = []
 
-  # 1. まず全体（<think>タグの中も含めて）からリスト形式（[ ... ]）のJSONを探す
   try:
     start_idx = raw_content.find("[")
     end_idx = raw_content.rfind("]")
@@ -177,7 +175,6 @@ def render_ai_message(content):
   except Exception:
     pass
 
-  # 2. リストでなければ、単体オブジェクト形式（{ ... }）のJSONを探す
   if not isinstance(parsed_list, list) or not parsed_list:
     try:
       cleaned = re.sub(r"<think>.*?</think>", "", raw_content, flags=re.DOTALL)
@@ -191,7 +188,6 @@ def render_ai_message(content):
     except Exception:
       pass
 
-  # 3. それでもパースできなかった場合のフォールバック
   if not parsed_list:
     cleaned = re.sub(r"<think>.*?</think>", "", raw_content, flags=re.DOTALL).strip()
     detected_name = "ユウカ"
@@ -201,75 +197,97 @@ def render_ai_message(content):
       detected_name = "ノア"
     parsed_list = [{"Name": detected_name, "message": cleaned, "Image": ""}]
 
-  # リストに含まれるキャラクターごとに順番に吹き出しを描画
+  return parsed_list
+
+
+def build_image_url(detected_name, custom_img, fixed_seed=None):
+  current_avatar = get_character_avatar(detected_name)
+  if not custom_img:
+    return ""
+
+  clean_val = str(custom_img).strip()
+  clean_val = re.sub(r"^\[.*?\]\((.*?)\)$", r"\1", clean_val)
+  clean_val = clean_val.strip('"').strip("'").rstrip("}").strip()
+
+  if clean_val.startswith("http") or clean_val.startswith("data:"):
+    return clean_val.split(" ")[0]
+
+  c_name = str(detected_name).strip()
+  anime_2d_base = (
+      "2d anime illustration, crisp dark outlines, cel shaded anime, "
+      "big expressive anime eyes, soft blush, warm cozy lighting, "
+      "not 3d, not realistic"
+  )
+
+  if "アオイ" in c_name:
+    char_base = (
+        f"{anime_2d_base}, Japanese woman, short dark bob hair, purple eyes"
+    )
+  elif "ノア" in c_name:
+    char_base = (
+        f"{anime_2d_base}, Japanese half woman, long dark purple half-up hair, purple eyes"
+    )
+  else:
+    char_base = (
+        f"{anime_2d_base}, Japanese woman, long wavy brown hair, flower hair clip, amber eyes"
+    )
+
+  combined_prompt = f"{clean_val}, {char_base}"
+  encoded_prompt = urllib.parse.quote(combined_prompt)
+  seed_val = fixed_seed if fixed_seed is not None else random.randint(1, 999999999)
+  return (
+      f"https://image.pollinations.ai/prompt/{encoded_prompt}"
+      f"?width=800&height=600&nologo=true&seed={seed_val}"
+  )
+
+
+def prepare_ai_message_record(content):
+  parsed_list = parse_ai_items(content)
+  items_data = []
   for idx, item in enumerate(parsed_list):
     if not isinstance(item, dict):
       continue
-
     detected_name = str(item.get("Name", item.get("name", "ユウカ"))).strip()
     display_text = str(
         item.get("message", item.get("text", item.get("content", "")))
     ).strip()
-
     if not display_text:
       display_text = str(item)
-
-    current_avatar = get_character_avatar(detected_name)
-    image_url = current_avatar
+    for marker in ["👗", "✨", "📍", "Time:", "Outfit:"]:
+      if marker in display_text:
+        display_text = display_text.split(marker)[0].strip()
 
     custom_img = (
         item.get("Image", "")
         or item.get("image", "")
         or item.get("image_prompt", "")
     )
+    img_url = ""
+    if idx == 0 and custom_img:
+      img_url = build_image_url(
+          detected_name, custom_img, fixed_seed=random.randint(1, 999999999)
+      )
 
-    if custom_img:
-      clean_val = str(custom_img).strip()
-      clean_val = re.sub(r"^\[.*?\]\((.*?)\)$", r"\1", clean_val)
-      clean_val = clean_val.strip('"').strip("'").rstrip("}").strip()
+    items_data.append({
+        "name": detected_name,
+        "text": display_text,
+        "image_url": img_url,
+    })
 
-      if clean_val.startswith("http") or clean_val.startswith("data:"):
-        image_url = clean_val.split(" ")[0]
-      else:
-        c_name = str(detected_name).strip()
+  return {"role": "ai", "items": items_data}
 
-        # ★ 添付画像（IMG_3789.JPG）のような線画・アニメ塗り・赤み・暖色光に寄せる簡潔なベース
-        anime_2d_base = (
-            "2d anime illustration, crisp dark outlines, cel shaded anime, "
-            "big expressive anime eyes, soft blush, warm cozy lighting, "
-            "not 3d, not realistic"
-        )
 
-        if "アオイ" in c_name:
-          char_base = (
-              f"{anime_2d_base}, Japanese woman, short dark bob hair, purple eyes"
-          )
-        elif "ノア" in c_name:
-          char_base = (
-              f"{anime_2d_base}, Japanese half woman, long dark purple half-up hair, purple eyes"
-          )
-        else:
-          char_base = (
-              f"{anime_2d_base}, Japanese woman, long wavy brown hair, flower hair clip, amber eyes"
-          )
-
-        # ★ シチュエーション（服装・背中・構図など）を最優先で反映させるため後ろだけでなく先頭にも要点を置く
-        combined_prompt = f"{clean_val}, {char_base}"
-        encoded_prompt = urllib.parse.quote(combined_prompt)
-        seed_val = random.randint(1, 999999999)
-        image_url = (
-            f"https://image.pollinations.ai/prompt/{encoded_prompt}"
-            f"?width=800&height=600&nologo=true&seed={seed_val}"
-        )
-
-    for marker in ["👗", "✨", "📍", "Time:", "Outfit:"]:
-      if marker in display_text:
-        display_text = display_text.split(marker)[0].strip()
+def render_prepared_ai_message(msg):
+  for item in msg.get("items", []):
+    detected_name = item.get("name", "ユウカ")
+    display_text = item.get("text", "")
+    image_url = item.get("image_url", "")
+    current_avatar = get_character_avatar(detected_name)
 
     img_html = (
         f'<div class="chat-img-container"><img src="{image_url}"'
-        ' class="chat-img"></div>'
-        if idx == 0 and custom_img
+        f' class="chat-img" onerror="this.style.display=\'none\';"></div>'
+        if image_url
         else ""
     )
 
@@ -303,7 +321,7 @@ for msg in st.session_state.messages:
         unsafe_allow_html=True,
     )
   else:
-    render_ai_message(msg["content"])
+    render_prepared_ai_message(msg)
 
 # チャット入力
 if prompt := st.chat_input("メッセージを入力... (ユウカ、アオイ、ノアなど)"):
@@ -344,8 +362,9 @@ if prompt := st.chat_input("メッセージを入力... (ユウカ、アオイ�
         if response.status_code == 200:
           res_data = response.json()
           answer = res_data.get("answer", "（応答がありませんでした）")
-          st.session_state.messages.append({"role": "ai", "content": answer})
-          render_ai_message(answer)
+          ai_record = prepare_ai_message_record(answer)
+          st.session_state.messages.append(ai_record)
+          st.rerun()
         else:
           st.error(
               f"APIエラーが発生しました (ステータスコード:"
