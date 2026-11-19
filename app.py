@@ -233,31 +233,28 @@ def render_ai_message(content):
       else:
         c_name = str(detected_name).strip()
 
-        # ★ 添付画像（IMG_3789.JPG）のような線画・アニメ塗り・暖色ライティングに寄せるベースプロンプト
+        # ★ 添付画像（IMG_3789.JPG）のような線画・アニメ塗り・赤み・暖色光に寄せる簡潔なベース
         anime_2d_base = (
-            "masterpiece, best quality, 2d anime illustration, "
-            "clean dark lineart, anime coloring, detailed anime eyes, "
-            "soft blush, warm cozy lighting, soft rim light, "
-            "no 3d render, no CGI, no photorealistic, no realistic skin"
+            "2d anime illustration, crisp dark outlines, cel shaded anime, "
+            "big expressive anime eyes, soft blush, warm cozy lighting, "
+            "not 3d, not realistic"
         )
 
         if "アオイ" in c_name:
           char_base = (
-              f"{anime_2d_base}, 30-year-old Japanese woman Aoi, "
-              "short dark bob hair, smart purple eyes"
+              f"{anime_2d_base}, Japanese woman, short dark bob hair, purple eyes"
           )
         elif "ノア" in c_name:
           char_base = (
-              f"{anime_2d_base}, 32-year-old Japanese half woman Noa, "
-              "dark purple long hair tied in a half-up style, sharp intelligent eyes"
+              f"{anime_2d_base}, Japanese half woman, long dark purple half-up hair, purple eyes"
           )
         else:
           char_base = (
-              f"{anime_2d_base}, 29-year-old Japanese woman Yuuka, "
-              "long brown wavy hair with braided side hair ornament, warm amber eyes"
+              f"{anime_2d_base}, Japanese woman, long wavy brown hair, flower hair clip, amber eyes"
           )
 
-        combined_prompt = f"{char_base}, {clean_val}"
+        # ★ シチュエーション（服装・背中・構図など）を最優先で反映させるため後ろだけでなく先頭にも要点を置く
+        combined_prompt = f"{clean_val}, {char_base}"
         encoded_prompt = urllib.parse.quote(combined_prompt)
         seed_val = random.randint(1, 999999999)
         image_url = (
